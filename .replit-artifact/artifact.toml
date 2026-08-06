@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "SIM-SISWA"
+description = "Sistem Informasi Manajemen Data Siswa — aplikasi pengelolaan data siswa sekolah yang lengkap dengan fitur input data, manajemen kelas, naik kelas, kelulusan, dan impor/ekspor data. Data disimpan di localStorage browser."
+version = "1.0.0"
+id = "artifacts/sim-siswa"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22851
+
+[services.development]
+run = "pnpm --filter @workspace/sim-siswa run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/sim-siswa", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/sim-siswa/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22851"
+BASE_PATH = "/"
