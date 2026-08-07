@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { utils, read, writeFile } from 'xlsx';
+import { supabase } from '@/lib/supabase';
 
 export interface Student {
   id: string;
@@ -47,90 +48,111 @@ const STORAGE_KEY_STUDENTS = 'sim_siswa_data';
 const STORAGE_KEY_CLASSES = 'sim_kelas_data';
 const STORAGE_KEY_YEAR = 'sim_tahun_ajaran';
 
-const initialDemoStudents: Student[] = [
-  {
-    id: 'demo-1',
-    nisn: '0051234567',
-    nis: '23241001',
-    nik: '3201010101050001',
-    nama: 'Budi Santoso',
-    asalSekolah: 'SMPN 1 Jakarta',
-    kelas: 'X IPA 1',
-    jenisKelamin: 'Laki-laki',
-    agama: 'Islam',
-    kotaLahir: 'Jakarta',
-    tanggalLahir: '2005-08-17',
-    hpSiswa: '081234567890',
-    status: 'Aktif',
-    alamat: 'Jl. Merdeka No. 45',
-    rt: '001',
-    rw: '002',
-    kelurahan: 'Gambir',
-    kecamatan: 'Gambir',
-    kodePos: '10110',
-    noKk: '3201010101050000',
-    namaAyah: 'Haryanto',
-    nikAyah: '3201010101800001',
-    thnLahirAyah: '1980',
-    pendidikanAyah: 'S1',
-    pekerjaanAyah: 'Pegawai Negeri',
-    penghasilanAyah: '5-10 Juta',
-    hpAyah: '081298765432',
-    namaIbu: 'Siti Aminah',
-    nikIbu: '3201014101820002',
-    thnLahirIbu: '1982',
-    pendidikanIbu: 'SMA',
-    pekerjaanIbu: 'Ibu Rumah Tangga',
-    penghasilanIbu: 'Tidak Berpenghasilan',
-    hpIbu: '081298765433',
-    tinggiBadan: '165',
-    beratBadan: '55',
-    anakKe: '1',
-    jumlahSaudara: '2',
-    golDarah: 'O'
-  },
-  {
-    id: 'demo-2',
-    nisn: '0057654321',
-    nis: '23241002',
-    nik: '3201014101050002',
-    nama: 'Rina Wijaya',
-    asalSekolah: 'SMPN 2 Jakarta',
-    kelas: 'X IPA 1',
-    jenisKelamin: 'Perempuan',
-    agama: 'Kristen Protestan',
-    kotaLahir: 'Bandung',
-    tanggalLahir: '2005-11-20',
-    hpSiswa: '085612345678',
-    status: 'Aktif',
-    alamat: 'Jl. Sudirman No. 8',
-    rt: '003',
-    rw: '004',
-    kelurahan: 'Senayan',
-    kecamatan: 'Kebayoran Baru',
-    kodePos: '12190',
-    noKk: '3201010101050003',
-    namaAyah: 'Hendrik Wijaya',
-    nikAyah: '3201010101780003',
-    thnLahirAyah: '1978',
-    pendidikanAyah: 'S2',
-    pekerjaanAyah: 'Wiraswasta',
-    penghasilanAyah: '>20 Juta',
-    hpAyah: '085698765432',
-    namaIbu: 'Maria',
-    nikIbu: '3201014101800004',
-    thnLahirIbu: '1980',
-    pendidikanIbu: 'S1',
-    pekerjaanIbu: 'Karyawan Swasta',
-    penghasilanIbu: '5-10 Juta',
-    hpIbu: '085698765433',
-    tinggiBadan: '158',
-    beratBadan: '48',
-    anakKe: '2',
-    jumlahSaudara: '3',
-    golDarah: 'A'
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Helper: Map Database Row to Student Interface
+export function mapDbToStudent(row: any): Student {
+  return {
+    id: row.id || '',
+    nisn: row.nisn || '',
+    nis: row.nis || '',
+    nik: row.nik || '',
+    nama: row.nama_lengkap || row.nama || '',
+    asalSekolah: row.asal_sekolah || '',
+    kelas: row.kelas || '',
+    jenisKelamin: row.jenis_kelamin === 'Perempuan' ? 'Perempuan' : 'Laki-laki',
+    agama: row.agama || 'Islam',
+    kotaLahir: row.tempat_lahir || '',
+    tanggalLahir: row.tanggal_lahir || '',
+    hpSiswa: row.no_hp || '',
+    status: (row.status_siswa || 'Aktif') as Student['status'],
+    alamat: row.alamat || '',
+    rt: row.rt || '',
+    rw: row.rw || '',
+    kelurahan: row.kelurahan || '',
+    kecamatan: row.kecamatan || '',
+    kodePos: row.kode_pos || '',
+    noKk: row.no_kk || '',
+    namaAyah: row.nama_ayah || '',
+    nikAyah: row.nik_ayah || '',
+    thnLahirAyah: row.thn_lahir_ayah || '',
+    pendidikanAyah: row.pendidikan_ayah || '',
+    pekerjaanAyah: row.pekerjaan_ayah || '',
+    penghasilanAyah: row.penghasilan_ayah || '',
+    hpAyah: row.hp_ayah || '',
+    namaIbu: row.nama_ibu || '',
+    nikIbu: row.nik_ibu || '',
+    thnLahirIbu: row.thn_lahir_ibu || '',
+    pendidikanIbu: row.pendidikan_ibu || '',
+    pekerjaanIbu: row.pekerjaan_ibu || '',
+    penghasilanIbu: row.penghasilan_ibu || '',
+    hpIbu: row.hp_ibu || '',
+    tinggiBadan: row.tinggi_badan || '',
+    beratBadan: row.berat_badan || '',
+    anakKe: row.anak_ke || '',
+    jumlahSaudara: row.jumlah_saudara || '',
+    golDarah: row.gol_darah || '',
+  };
+}
+
+// Helper: Map Student Interface to Database Columns
+export function mapStudentToDb(student: Partial<Student>): any {
+  const result: any = {};
+  
+  if (student.id && uuidRegex.test(student.id)) {
+    result.id = student.id;
   }
-];
+  
+  if (student.nisn !== undefined) result.nisn = student.nisn;
+  if (student.nis !== undefined) result.nis = student.nis;
+  if (student.nik !== undefined) result.nik = student.nik;
+  
+  if (student.nama !== undefined) {
+    result.nama = student.nama;
+    result.nama_lengkap = student.nama;
+  }
+  
+  if (student.asalSekolah !== undefined) result.asal_sekolah = student.asalSekolah;
+  if (student.kelas !== undefined) result.kelas = student.kelas;
+  if (student.jenisKelamin !== undefined) result.jenis_kelamin = student.jenisKelamin;
+  if (student.agama !== undefined) result.agama = student.agama;
+  if (student.kotaLahir !== undefined) result.tempat_lahir = student.kotaLahir;
+  if (student.tanggalLahir !== undefined) result.tanggal_lahir = student.tanggalLahir || null;
+  if (student.hpSiswa !== undefined) result.no_hp = student.hpSiswa;
+  if (student.status !== undefined) result.status_siswa = student.status;
+  
+  if (student.alamat !== undefined) result.alamat = student.alamat;
+  if (student.rt !== undefined) result.rt = student.rt;
+  if (student.rw !== undefined) result.rw = student.rw;
+  if (student.kelurahan !== undefined) result.kelurahan = student.kelurahan;
+  if (student.kecamatan !== undefined) result.kecamatan = student.kecamatan;
+  if (student.kodePos !== undefined) result.kode_pos = student.kodePos;
+  if (student.noKk !== undefined) result.no_kk = student.noKk;
+  
+  if (student.namaAyah !== undefined) result.nama_ayah = student.namaAyah;
+  if (student.nikAyah !== undefined) result.nik_ayah = student.nikAyah;
+  if (student.thnLahirAyah !== undefined) result.thn_lahir_ayah = student.thnLahirAyah;
+  if (student.pendidikanAyah !== undefined) result.pendidikan_ayah = student.pendidikanAyah;
+  if (student.pekerjaanAyah !== undefined) result.pekerjaan_ayah = student.pekerjaanAyah;
+  if (student.penghasilanAyah !== undefined) result.penghasilan_ayah = student.penghasilanAyah;
+  if (student.hpAyah !== undefined) result.hp_ayah = student.hpAyah;
+  
+  if (student.namaIbu !== undefined) result.nama_ibu = student.namaIbu;
+  if (student.nikIbu !== undefined) result.nik_ibu = student.nikIbu;
+  if (student.thnLahirIbu !== undefined) result.thn_lahir_ibu = student.thnLahirIbu;
+  if (student.pendidikanIbu !== undefined) result.pendidikan_ibu = student.pendidikanIbu;
+  if (student.pekerjaanIbu !== undefined) result.pekerjaan_ibu = student.pekerjaanIbu;
+  if (student.penghasilanIbu !== undefined) result.penghasilan_ibu = student.penghasilanIbu;
+  if (student.hpIbu !== undefined) result.hp_ibu = student.hpIbu;
+  
+  if (student.tinggiBadan !== undefined) result.tinggi_badan = student.tinggiBadan;
+  if (student.beratBadan !== undefined) result.berat_badan = student.beratBadan;
+  if (student.anakKe !== undefined) result.anak_ke = student.anakKe;
+  if (student.jumlahSaudara !== undefined) result.jumlah_saudara = student.jumlahSaudara;
+  if (student.golDarah !== undefined) result.gol_darah = student.golDarah;
+  
+  return result;
+}
 
 export function useStudents() {
   const [students, setStudents] = useState<Student[]>([]);
@@ -138,43 +160,11 @@ export function useStudents() {
   const [tahunAjaran, setTahunAjaran] = useState<string>('');
   const [isLoaded, setIsLoaded] = useState(false);
 
-  useEffect(() => {
-    // Load from local storage
-    const storedStudents = localStorage.getItem(STORAGE_KEY_STUDENTS);
-    const storedClasses = localStorage.getItem(STORAGE_KEY_CLASSES);
-    const storedYear = localStorage.getItem(STORAGE_KEY_YEAR);
-
-    if (storedStudents) {
-      setStudents(JSON.parse(storedStudents));
-    } else {
-      setStudents(initialDemoStudents);
-      localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(initialDemoStudents));
-    }
-
-    if (storedClasses) {
-      setClasses(JSON.parse(storedClasses));
-    } else {
-      const demoClasses = ['X IPA 1'];
-      setClasses(demoClasses);
-      localStorage.setItem(STORAGE_KEY_CLASSES, JSON.stringify(demoClasses));
-    }
-
-    if (storedYear) {
-      setTahunAjaran(storedYear);
-    } else {
-      const defaultYear = '2024/2025';
-      setTahunAjaran(defaultYear);
-      localStorage.setItem(STORAGE_KEY_YEAR, defaultYear);
-    }
-
-    setIsLoaded(true);
-  }, []);
-
+  // Sync classes to local state & local storage
   const syncClasses = useCallback((currentStudents: Student[]) => {
     const uniqueClasses = Array.from(new Set(currentStudents.map((s) => s.kelas).filter(Boolean)));
     uniqueClasses.sort();
     
-    // Merge with existing classes in case some classes are empty but shouldn't be deleted yet
     setClasses((prevClasses) => {
       const merged = Array.from(new Set([...prevClasses, ...uniqueClasses])).sort();
       localStorage.setItem(STORAGE_KEY_CLASSES, JSON.stringify(merged));
@@ -182,24 +172,145 @@ export function useStudents() {
     });
   }, []);
 
-  const saveStudents = useCallback((newStudents: Student[]) => {
+  // Fetch students from Supabase
+  const fetchStudents = useCallback(async () => {
+    try {
+      const { data: dbStudents, error } = await supabase
+        .from('siswa')
+        .select('*')
+        .order('nama_lengkap', { ascending: true });
+
+      if (error) throw error;
+
+      const mapped = (dbStudents || []).map(mapDbToStudent);
+      setStudents(mapped);
+      localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(mapped));
+      
+      const uniqueClasses = Array.from(new Set(mapped.map((s) => s.kelas).filter(Boolean)));
+      uniqueClasses.sort();
+      setClasses(uniqueClasses);
+      localStorage.setItem(STORAGE_KEY_CLASSES, JSON.stringify(uniqueClasses));
+    } catch (err) {
+      console.error('Error fetching students from Supabase:', err);
+      // Fallback to local storage if offline or error
+      const storedStudents = localStorage.getItem(STORAGE_KEY_STUDENTS);
+      if (storedStudents) {
+        setStudents(JSON.parse(storedStudents));
+      }
+    }
+  }, []);
+
+  // Initial Load
+  useEffect(() => {
+    async function init() {
+      await fetchStudents();
+
+      const storedYear = localStorage.getItem(STORAGE_KEY_YEAR);
+      if (storedYear) {
+        setTahunAjaran(storedYear);
+      } else {
+        const defaultYear = '2024/2025';
+        setTahunAjaran(defaultYear);
+        localStorage.setItem(STORAGE_KEY_YEAR, defaultYear);
+      }
+      setIsLoaded(true);
+    }
+    init();
+  }, [fetchStudents]);
+
+  // Save changes to Supabase (Batch operation / sync)
+  const saveStudents = useCallback(async (newStudents: Student[]) => {
     setStudents(newStudents);
     localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(newStudents));
     syncClasses(newStudents);
+
+    try {
+      const dbRows = newStudents.map(mapStudentToDb);
+      const { error } = await supabase
+        .from('siswa')
+        .upsert(dbRows, { onConflict: 'nisn' });
+      if (error) throw error;
+    } catch (err) {
+      console.error('Failed to sync changes to Supabase:', err);
+    }
   }, [syncClasses]);
 
-  const addStudent = (student: Student) => {
-    saveStudents([student, ...students]);
+  const addStudent = async (student: Student) => {
+    const updated = [student, ...students];
+    setStudents(updated);
+    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updated));
+    syncClasses(updated);
+
+    try {
+      const dbRow = mapStudentToDb(student);
+      const { error } = await supabase
+        .from('siswa')
+        .insert([dbRow]);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Failed to add student to Supabase:', err);
+    }
   };
 
-  const updateStudent = (id: string, data: Partial<Student>) => {
+  const updateStudent = async (id: string, data: Partial<Student>) => {
     const updated = students.map((s) => (s.id === id ? { ...s, ...data } : s));
-    saveStudents(updated);
+    setStudents(updated);
+    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updated));
+    syncClasses(updated);
+
+    try {
+      const dbRow = mapStudentToDb(data);
+      const studentObj = students.find(s => s.id === id);
+      if (studentObj) {
+        const queryId = uuidRegex.test(id) ? id : null;
+        let query = supabase.from('siswa').update(dbRow);
+        
+        if (queryId && studentObj.nisn) {
+          query = query.or(`id.eq.${queryId},nisn.eq.${studentObj.nisn}`);
+        } else if (queryId) {
+          query = query.eq('id', queryId);
+        } else if (studentObj.nisn) {
+          query = query.eq('nisn', studentObj.nisn);
+        } else {
+          throw new Error('No unique identifier found to update student');
+        }
+
+        const { error } = await query;
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error('Failed to update student in Supabase:', err);
+    }
   };
 
-  const deleteStudent = (id: string) => {
+  const deleteStudent = async (id: string) => {
+    const studentObj = students.find(s => s.id === id);
     const updated = students.filter((s) => s.id !== id);
-    saveStudents(updated);
+    setStudents(updated);
+    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updated));
+    syncClasses(updated);
+
+    try {
+      if (studentObj) {
+        const queryId = uuidRegex.test(id) ? id : null;
+        let query = supabase.from('siswa').delete();
+
+        if (queryId && studentObj.nisn) {
+          query = query.or(`id.eq.${queryId},nisn.eq.${studentObj.nisn}`);
+        } else if (queryId) {
+          query = query.eq('id', queryId);
+        } else if (studentObj.nisn) {
+          query = query.eq('nisn', studentObj.nisn);
+        } else {
+          throw new Error('No unique identifier found to delete student');
+        }
+
+        const { error } = await query;
+        if (error) throw error;
+      }
+    } catch (err) {
+      console.error('Failed to delete student from Supabase:', err);
+    }
   };
 
   const updateTahunAjaran = (year: string) => {
@@ -212,27 +323,74 @@ export function useStudents() {
     localStorage.setItem(STORAGE_KEY_CLASSES, JSON.stringify(newClasses));
   };
 
-  const pindahKelas = (studentIds: string[], targetClass: string) => {
+  const pindahKelas = async (studentIds: string[], targetClass: string) => {
     const updated = students.map((s) => {
       if (studentIds.includes(s.id)) {
         return { ...s, kelas: targetClass };
       }
       return s;
     });
-    saveStudents(updated);
+    setStudents(updated);
+    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updated));
+    syncClasses(updated);
+
+    try {
+      const selectedStudents = students.filter(s => studentIds.includes(s.id));
+      const uuids = selectedStudents.map(s => s.id).filter(id => uuidRegex.test(id));
+      const nisns = selectedStudents.map(s => s.nisn).filter(Boolean);
+
+      let query = supabase.from('siswa').update({ kelas: targetClass });
+      if (uuids.length > 0 && nisns.length > 0) {
+        query = query.or(`id.in.(${uuids.join(',')}),nisn.in.(${nisns.map(n => `"${n}"`).join(',')})`);
+      } else if (uuids.length > 0) {
+        query = query.in('id', uuids);
+      } else if (nisns.length > 0) {
+        query = query.in('nisn', nisns);
+      } else {
+        return;
+      }
+
+      const { error } = await query;
+      if (error) throw error;
+    } catch (err) {
+      console.error('Failed to move class in Supabase:', err);
+    }
   };
 
-  const luluskanSiswa = (studentIds: string[]) => {
+  const luluskanSiswa = async (studentIds: string[]) => {
     const updated = students.map((s) => {
       if (studentIds.includes(s.id)) {
         return { ...s, status: 'Alumni' as const };
       }
       return s;
     });
-    saveStudents(updated);
+    setStudents(updated);
+    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updated));
+    syncClasses(updated);
+
+    try {
+      const selectedStudents = students.filter(s => studentIds.includes(s.id));
+      const uuids = selectedStudents.map(s => s.id).filter(id => uuidRegex.test(id));
+      const nisns = selectedStudents.map(s => s.nisn).filter(Boolean);
+
+      let query = supabase.from('siswa').update({ status_siswa: 'Alumni' });
+      if (uuids.length > 0 && nisns.length > 0) {
+        query = query.or(`id.in.(${uuids.join(',')}),nisn.in.(${nisns.map(n => `"${n}"`).join(',')})`);
+      } else if (uuids.length > 0) {
+        query = query.in('id', uuids);
+      } else if (nisns.length > 0) {
+        query = query.in('nisn', nisns);
+      } else {
+        return;
+      }
+
+      const { error } = await query;
+      if (error) throw error;
+    } catch (err) {
+      console.error('Failed to graduate students in Supabase:', err);
+    }
   };
 
-  // suggestNextClass based on simple regex (X -> XI -> XII)
   const suggestNextClass = (className: string) => {
     if (/^X\s/.test(className) && !/^X[IV]+\s/.test(className)) {
       return 'XI ' + className.slice(2);
@@ -249,7 +407,7 @@ export function useStudents() {
   const importExcel = async (file: File): Promise<number> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
           const data = e.target?.result;
           const workbook = read(data, { type: 'binary' });
@@ -266,7 +424,7 @@ export function useStudents() {
 
             if (rawNama && rawNisn) {
               const newStudent: Student = {
-                id: 'std-' + Date.now() + Math.random().toString(36).substr(2, 9),
+                id: crypto.randomUUID(),
                 nama: String(rawNama),
                 nisn: String(rawNisn),
                 nis: String(row['nis'] || row['NIS'] || ''),
@@ -274,7 +432,7 @@ export function useStudents() {
                 kelas: String(row['kelas'] || row['Kelas'] || ''),
                 asalSekolah: String(row['asal sekolah'] || row['Asal Sekolah'] || ''),
                 jenisKelamin: String(row['jk'] || row['JK'] || row['jenis kelamin']) === 'Perempuan' ? 'Perempuan' : 'Laki-laki',
-                agama: String(row['agama'] || row['Agama'] || 'Lainnya'),
+                agama: String(row['agama'] || row['Agama'] || 'Islam'),
                 kotaLahir: String(row['tempat lahir'] || row['Tempat Lahir'] || ''),
                 tanggalLahir: String(row['tanggal lahir'] || row['Tanggal Lahir'] || ''),
                 hpSiswa: String(row['no hp'] || row['HP'] || ''),
@@ -312,7 +470,7 @@ export function useStudents() {
           });
 
           if (importedCount > 0) {
-            saveStudents([...newStudents, ...students]);
+            await saveStudents([...newStudents, ...students]);
           }
           resolve(importedCount);
         } catch (error) {
@@ -384,6 +542,7 @@ export function useStudents() {
     suggestNextClass,
     importExcel,
     downloadExcelTemplate,
-    syncClasses: () => syncClasses(students)
+    syncClasses: () => syncClasses(students),
+    fetchStudents
   };
 }

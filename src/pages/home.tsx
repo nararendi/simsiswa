@@ -33,7 +33,7 @@ export default function Home() {
     students, classes, tahunAjaran, isLoaded,
     addStudent, updateStudent, deleteStudent, updateTahunAjaran,
     updateClasses, pindahKelas, luluskanSiswa, suggestNextClass,
-    importExcel, downloadExcelTemplate, syncClasses
+    importExcel, downloadExcelTemplate, syncClasses, fetchStudents
   } = useStudents();
 
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
@@ -507,6 +507,7 @@ export default function Home() {
       <SinkronisasiDapodikModal 
         isOpen={modalDapodikOpen}
         onClose={() => setModalDapodikOpen(false)}
+        onSuccess={fetchStudents}
       />
     </div>
   );
