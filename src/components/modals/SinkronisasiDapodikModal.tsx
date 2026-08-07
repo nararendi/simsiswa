@@ -20,7 +20,8 @@ interface DapodikPesertaDidik {
   nama_wali: string;
   nama_kelas: string;
   tahun_masuk: string;
-  status: string;
+  status?: string | null;
+  [key: string]: any; // Allow any other columns returned by Dapodik
 }
 
 export function SinkronisasiDapodikModal({
@@ -119,22 +120,54 @@ export function SinkronisasiDapodikModal({
         .filter(item => item.nisn && item.nisn.trim()) // Lewati jika NISN kosong
         .map(item => {
           const namaLengkap = item.nama || '';
-          const statusSiswa = item.status === 'Aktif' || item.status === '1' ? 'Aktif' : 'Non-Aktif';
+          
+          // Parsing status Dapodik secara cerdas:
+          // Jika status kosong/tidak diset, default ke 'Aktif'.
+          // Jika secara eksplisit berisi indikator tidak aktif, set ke 'Non-Aktif'.
+          let statusSiswa = 'Aktif';
+          if (item.status !== undefined && item.status !== null) {
+            const statusStr = String(item.status).trim().toLowerCase();
+            if (statusStr === '0' || statusStr === 'tidak aktif' || statusStr === 'non-aktif' || statusStr === 'non aktif' || statusStr === 'keluar' || statusStr === 'lulus') {
+              statusSiswa = 'Non-Aktif';
+            }
+          }
+
+          // Kumpulkan semua kolom informasi lengkap dari Dapodik
           return {
             nisn:                item.nisn.trim(),
             nama:                namaLengkap,          // kolom lama (NOT NULL) — wajib diisi
             nama_lengkap:        namaLengkap,          // kolom baru
             jenis_kelamin:       item.jenis_kelamin === 'P' || item.jenis_kelamin === 'Perempuan' ? 'Perempuan' : 'Laki-laki',
-            tempat_lahir:        item.tempat_lahir  || null,
+            tempat_lahir:        item.tempat_lahir || item.kota_lahir || null,
             tanggal_lahir:       item.tanggal_lahir || null,
-            alamat:              item.alamat_jalan  || null,
-            nama_ayah:           item.nama_ayah     || null,
-            nama_ibu:            item.nama_ibu      || null,
-            nama_wali:           item.nama_wali     || null,
-            kelas:               item.nama_kelas    || null,
-            tahun_masuk:         item.tahun_masuk   || null,
+            alamat:              item.alamat_jalan || item.alamat || null,
+            nama_ayah:           item.nama_ayah || null,
+            nama_ibu:            item.nama_ibu || item.nama_ibu_kandung || null,
+            nama_wali:           item.nama_wali || null,
+            kelas:               item.nama_kelas || item.kelas || null,
+            tahun_masuk:         item.tahun_masuk || null,
             status_siswa:        statusSiswa,          // kolom yang ada di tabel
             synced_from_dapodik: true,
+
+            // Informasi periodik & data tambahan
+            nis:                 item.nipd || item.nis || item.nomor_induk || null,
+            nik:                 item.nik || item.no_identitas || null,
+            asal_sekolah:        item.sekolah_asal || item.asal_sekolah || null,
+            agama:               item.agama || item.agama_id_str || 'Islam',
+            no_hp:               item.nomor_telepon_seluler || item.no_hp || item.hp || null,
+            rt:                  item.rt ? String(item.rt) : null,
+            rw:                  item.rw ? String(item.rw) : null,
+            kelurahan:           item.desa_kelurahan || item.kelurahan || null,
+            kecamatan:           item.kecamatan || null,
+            kode_pos:            item.kode_pos || null,
+            no_kk:               item.no_kk || item.nomor_kk || null,
+            nik_ayah:            item.nik_ayah || null,
+            nik_ibu:             item.nik_ibu || item.nik_ibu_kandung || null,
+            tinggi_badan:        item.tinggi_badan ? String(item.tinggi_badan) : null,
+            berat_badan:         item.berat_badan ? String(item.berat_badan) : null,
+            anak_ke:             item.anak_ke ? String(item.anak_ke) : null,
+            jumlah_saudara:      item.jumlah_saudara ? String(item.jumlah_saudara) : null,
+            gol_darah:           item.golongan_darah || item.gol_darah || null,
           };
         });
 
