@@ -58,23 +58,56 @@ export function SinkronisasiDapodikModal({
     localStorage.setItem('dapodik_token', token.trim());
 
     try {
-      // 1. Ambil data dari Web Service Dapodik lokal
-      const response = await fetch('http://localhost:5774/rest/PesertaDidik', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token.trim()}`,
-          'Accept': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Dapodik Error: ${response.statusText} (${response.status})`);
+      // 1. Ambil data dari Web Service Dapodik lokal (via Vite proxy untuk menghindari CORS)
+      // URL: /api/dapodik/rest/PesertaDidik → proxy ke http://localhost:5774/rest/PesertaDidik
+      let response: Response;
+      try {
+        response = await fetch('/api/dapodik/rest/PesertaDidik', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token.trim()}`,
+            'X-Auth-Token': token.trim(),   // beberapa versi Dapodik pakai header ini
+            'token': token.trim(),
+            'Accept': 'application/json',
+          },
+        });
+      } catch (networkErr: any) {
+        throw new Error(
+          `Tidak dapat terhubung ke Dapodik lokal (port 5774). ` +
+          `Pastikan aplikasi Dapodik sedang berjalan di komputer ini. ` +
+          `Detail: ${networkErr.message}`
+        );
       }
 
-      const rawData: DapodikPesertaDidik[] = await response.json();
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '');
+        throw new Error(
+          `Dapodik menolak permintaan (HTTP ${response.status}: ${response.statusText}). ` +
+          `${errText ? 'Pesan: ' + errText.slice(0, 200) : ''} ` +
+          `Periksa apakah token Web Service Anda masih valid.`
+        );
+      }
 
-      if (!Array.isArray(rawData) || rawData.length === 0) {
-        throw new Error('Data peserta didik tidak ditemukan atau kosong.');
+      // Parse response — Dapodik bisa mengembalikan array langsung ATAU object {data:[...]}
+      let rawData: DapodikPesertaDidik[];
+      try {
+        const parsed = await response.json();
+        if (Array.isArray(parsed)) {
+          rawData = parsed;
+        } else if (parsed && Array.isArray(parsed.data)) {
+          rawData = parsed.data;
+        } else if (parsed && Array.isArray(parsed.rows)) {
+          rawData = parsed.rows;
+        } else {
+          console.warn('Format response Dapodik tidak dikenal:', parsed);
+          rawData = [];
+        }
+      } catch {
+        throw new Error('Response dari Dapodik bukan format JSON yang valid.');
+      }
+
+      if (rawData.length === 0) {
+        throw new Error('Data peserta didik dari Dapodik kosong. Mungkin belum ada siswa terdaftar di Dapodik lokal.');
       }
 
       let addedCount = 0;
