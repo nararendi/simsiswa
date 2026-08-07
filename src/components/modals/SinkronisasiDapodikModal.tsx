@@ -133,8 +133,7 @@ export function SinkronisasiDapodikModal({
             nama_wali:           item.nama_wali     || null,
             kelas:               item.nama_kelas    || null,
             tahun_masuk:         item.tahun_masuk   || null,
-            status:              statusSiswa,          // kolom lama (jika masih ada)
-            status_siswa:        statusSiswa,          // kolom baru
+            status_siswa:        statusSiswa,          // kolom yang ada di tabel
             synced_from_dapodik: true,
           };
         });
