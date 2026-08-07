@@ -432,54 +432,148 @@ export function useStudents() {
           const worksheet = workbook.Sheets[firstSheetName];
           const json = utils.sheet_to_json(worksheet);
 
+          // Sinonim pencarian kolom Excel (Fuzzy Matching)
+          const synonymsMap: Record<string, string[]> = {
+            nama: ['nama', 'nama lengkap', 'nama_lengkap', 'fullname', 'full name', 'siswa', 'nama siswa'],
+            nisn: ['nisn', 'nomor induk siswa nasional', 'no. nisn'],
+            nis: ['nis', 'nipd', 'nomor induk', 'nomor induk siswa', 'no. nis'],
+            nik: ['nik', 'no. nik', 'nomor induk kependudukan', 'no ktp', 'ktp'],
+            kelas: ['kelas', 'rombel', 'nama kelas', 'tingkat'],
+            asalSekolah: ['asal sekolah', 'sekolah asal', 'asal_sekolah', 'smp asal', 'sekolah smp'],
+            jenisKelamin: ['jenis kelamin', 'jk', 'sex', 'gender', 'jenis_kelamin', 'l/p', 'jenis_kelamin'],
+            agama: ['agama', 'religion'],
+            kotaLahir: ['tempat lahir', 'kota lahir', 'tempat_lahir', 'kota_lahir'],
+            tanggalLahir: ['tanggal lahir', 'tgl lahir', 'tanggal_lahir', 'tgl_lahir', 'birthdate'],
+            hpSiswa: ['hp', 'no hp', 'hp siswa', 'no telp', 'telepon', 'hp_siswa', 'nomor telepon seluler', 'no. hp'],
+            alamat: ['alamat', 'alamat jalan', 'jalan', 'alamat_jalan'],
+            rt: ['rt', 'rt/rw', 'nomor rt'],
+            rw: ['rw', 'nomor rw'],
+            kelurahan: ['kelurahan', 'desa', 'desa/kelurahan', 'kelurahan/desa', 'desa_kelurahan'],
+            kecamatan: ['kecamatan', 'distrik'],
+            kodePos: ['kode pos', 'kodepos', 'kode_pos', 'zip', 'zipcode'],
+            noKk: ['no kk', 'nomor kk', 'kartu keluarga', 'no_kk'],
+            namaAyah: ['nama ayah', 'ayah', 'nama_ayah'],
+            nikAyah: ['nik ayah', 'nik_ayah'],
+            thnLahirAyah: ['tahun lahir ayah', 'thn lahir ayah', 'tahun_lahir_ayah', 'lahir_ayah'],
+            pendidikanAyah: ['pendidikan ayah', 'pendidikan_ayah', 'lulusan ayah'],
+            pekerjaanAyah: ['pekerjaan ayah', 'pekerjaan_ayah', 'kerja ayah'],
+            penghasilanAyah: ['penghasilan ayah', 'penghasilan_ayah', 'gaji ayah'],
+            hpAyah: ['hp ayah', 'no hp ayah', 'telepon ayah'],
+            namaIbu: ['nama ibu', 'ibu', 'nama_ibu', 'nama ibu kandung', 'nama_ibu_kandung'],
+            nikIbu: ['nik ibu', 'nik_ibu'],
+            thnLahirIbu: ['tahun lahir ibu', 'thn lahir ibu', 'tahun_lahir_ibu', 'lahir_ibu'],
+            pendidikanIbu: ['pendidikan ibu', 'pendidikan_ibu', 'lulusan ibu'],
+            pekerjaanIbu: ['pekerjaan ibu', 'pekerjaan_ibu', 'kerja ibu'],
+            penghasilanIbu: ['penghasilan ibu', 'penghasilan_ibu', 'gaji ibu'],
+            hpIbu: ['hp ibu', 'no hp ibu', 'telepon ibu'],
+            tinggiBadan: ['tinggi badan', 'tinggi', 'tinggi_badan', 'tb'],
+            beratBadan: ['berat badan', 'berat', 'berat_badan', 'bb'],
+            anakKe: ['anak ke', 'anak_ke', 'anak keberapa'],
+            jumlahSaudara: ['jumlah saudara', 'saudara', 'jumlah_saudara'],
+            golDarah: ['gol darah', 'golongan darah', 'gol_darah', 'blood type', 'darah']
+          };
+
+          // Helper pencari nilai kolom dari Excel
+          const getExcelValue = (row: any, fieldKey: string): string => {
+            const synonyms = synonymsMap[fieldKey];
+            if (!synonyms) return '';
+
+            const rowKeys = Object.keys(row);
+            for (const rowKey of rowKeys) {
+              const cleanRowKey = rowKey.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+              for (const synonym of synonyms) {
+                const cleanSynonym = synonym.replace(/[^a-z0-9]/g, '');
+                if (cleanRowKey === cleanSynonym) {
+                  return String(row[rowKey] || '').trim();
+                }
+              }
+            }
+            return '';
+          };
+
+          // Helper perapih teks (Title Case untuk nama/tempat, Upper Case untuk NIK/NISN)
+          const formatValue = (val: string, fieldKey: string): string => {
+            if (!val) return '';
+            
+            const uppercaseKeys = ['nisn', 'nis', 'nik', 'rt', 'rw', 'kodePos', 'noKk', 'nikAyah', 'nikIbu', 'golDarah'];
+            if (uppercaseKeys.includes(fieldKey)) {
+              return val.toUpperCase();
+            }
+
+            const titleCaseKeys = [
+              'nama', 'asalSekolah', 'kotaLahir', 'alamat', 'kelurahan', 'kecamatan', 
+              'namaAyah', 'pendidikanAyah', 'pekerjaanAyah', 'namaIbu', 'pendidikanIbu', 
+              'pekerjaanIbu', 'agama', 'kelas'
+            ];
+            if (titleCaseKeys.includes(fieldKey)) {
+              return val
+                .toLowerCase()
+                .split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+            }
+
+            return val;
+          };
+
           let importedCount = 0;
           const newStudents: Student[] = [];
 
           json.forEach((row: any) => {
-            const rawNama = row['nama'] || row['Nama'] || row['NAMA LENGKAP'] || row['nama lengkap'];
-            const rawNisn = row['nisn'] || row['NISN'];
+            const rawNama = getExcelValue(row, 'nama');
+            const rawNisn = getExcelValue(row, 'nisn');
 
             if (rawNama && rawNisn) {
+              // Parse Jenis Kelamin cerdas
+              let jk = getExcelValue(row, 'jenisKelamin');
+              let cleanJk: 'Laki-laki' | 'Perempuan' = 'Laki-laki';
+              if (jk) {
+                const jkLower = jk.toLowerCase();
+                if (jkLower === 'p' || jkLower.includes('perempuan') || jkLower.includes('wanita') || jkLower === 'female') {
+                  cleanJk = 'Perempuan';
+                }
+              }
+
               const newStudent: Student = {
                 id: crypto.randomUUID(),
-                nama: String(rawNama),
-                nisn: String(rawNisn),
-                nis: String(row['nis'] || row['NIS'] || ''),
-                nik: String(row['nik'] || row['NIK'] || ''),
-                kelas: String(row['kelas'] || row['Kelas'] || ''),
-                asalSekolah: String(row['asal sekolah'] || row['Asal Sekolah'] || ''),
-                jenisKelamin: String(row['jk'] || row['JK'] || row['jenis kelamin']) === 'Perempuan' ? 'Perempuan' : 'Laki-laki',
-                agama: String(row['agama'] || row['Agama'] || 'Islam'),
-                kotaLahir: String(row['tempat lahir'] || row['Tempat Lahir'] || ''),
-                tanggalLahir: String(row['tanggal lahir'] || row['Tanggal Lahir'] || ''),
-                hpSiswa: String(row['no hp'] || row['HP'] || ''),
-                status: 'Aktif',
-                alamat: String(row['alamat'] || row['Alamat'] || ''),
-                rt: String(row['rt'] || row['RT'] || ''),
-                rw: String(row['rw'] || row['RW'] || ''),
-                kelurahan: String(row['kelurahan'] || row['Kelurahan'] || ''),
-                kecamatan: String(row['kecamatan'] || row['Kecamatan'] || ''),
-                kodePos: String(row['kode pos'] || row['Kode Pos'] || ''),
-                noKk: String(row['no kk'] || row['No KK'] || ''),
-                namaAyah: String(row['nama ayah'] || row['Nama Ayah'] || ''),
-                nikAyah: String(row['nik ayah'] || row['NIK Ayah'] || ''),
-                thnLahirAyah: String(row['tahun lahir ayah'] || ''),
-                pendidikanAyah: String(row['pendidikan ayah'] || ''),
-                pekerjaanAyah: String(row['pekerjaan ayah'] || ''),
-                penghasilanAyah: String(row['penghasilan ayah'] || ''),
-                hpAyah: String(row['hp ayah'] || ''),
-                namaIbu: String(row['nama ibu'] || row['Nama Ibu'] || ''),
-                nikIbu: String(row['nik ibu'] || row['NIK Ibu'] || ''),
-                thnLahirIbu: String(row['tahun lahir ibu'] || ''),
-                pendidikanIbu: String(row['pendidikan ibu'] || ''),
-                pekerjaanIbu: String(row['pekerjaan ibu'] || ''),
-                penghasilanIbu: String(row['penghasilan ibu'] || ''),
-                hpIbu: String(row['hp ibu'] || ''),
-                tinggiBadan: String(row['tinggi badan'] || ''),
-                beratBadan: String(row['berat badan'] || ''),
-                anakKe: String(row['anak ke'] || ''),
-                jumlahSaudara: String(row['jumlah saudara'] || ''),
-                golDarah: String(row['gol darah'] || '')
+                nama:             formatValue(rawNama, 'nama'),
+                nisn:             formatValue(rawNisn, 'nisn'),
+                nis:              formatValue(getExcelValue(row, 'nis'), 'nis'),
+                nik:              formatValue(getExcelValue(row, 'nik'), 'nik'),
+                kelas:            formatValue(getExcelValue(row, 'kelas'), 'kelas'),
+                asalSekolah:      formatValue(getExcelValue(row, 'asalSekolah'), 'asalSekolah'),
+                jenisKelamin:     cleanJk,
+                agama:            formatValue(getExcelValue(row, 'agama') || 'Islam', 'agama'),
+                kotaLahir:        formatValue(getExcelValue(row, 'kotaLahir'), 'kotaLahir'),
+                tanggalLahir:     getExcelValue(row, 'tanggalLahir'),
+                hpSiswa:          getExcelValue(row, 'hpSiswa'),
+                status:           'Aktif',
+                alamat:           formatValue(getExcelValue(row, 'alamat'), 'alamat'),
+                rt:               formatValue(getExcelValue(row, 'rt'), 'rt'),
+                rw:               formatValue(getExcelValue(row, 'rw'), 'rw'),
+                kelurahan:        formatValue(getExcelValue(row, 'kelurahan'), 'kelurahan'),
+                kecamatan:        formatValue(getExcelValue(row, 'kecamatan'), 'kecamatan'),
+                kodePos:          formatValue(getExcelValue(row, 'kodePos'), 'kodePos'),
+                noKk:             formatValue(getExcelValue(row, 'noKk'), 'noKk'),
+                namaAyah:         formatValue(getExcelValue(row, 'namaAyah'), 'namaAyah'),
+                nikAyah:          formatValue(getExcelValue(row, 'nikAyah'), 'nikAyah'),
+                thnLahirAyah:     getExcelValue(row, 'thnLahirAyah'),
+                pendidikanAyah:   formatValue(getExcelValue(row, 'pendidikanAyah'), 'pendidikanAyah'),
+                pekerjaanAyah:    formatValue(getExcelValue(row, 'pekerjaanAyah'), 'pekerjaanAyah'),
+                penghasilanAyah:  formatValue(getExcelValue(row, 'penghasilanAyah'), 'penghasilanAyah'),
+                hpAyah:           getExcelValue(row, 'hpAyah'),
+                namaIbu:          formatValue(getExcelValue(row, 'namaIbu'), 'namaIbu'),
+                nikIbu:           formatValue(getExcelValue(row, 'nikIbu'), 'nikIbu'),
+                thnLahirIbu:      getExcelValue(row, 'thnLahirIbu'),
+                pendidikanIbu:    formatValue(getExcelValue(row, 'pendidikanIbu'), 'pendidikanIbu'),
+                pekerjaanIbu:     formatValue(getExcelValue(row, 'pekerjaanIbu'), 'pekerjaanIbu'),
+                penghasilanIbu:   formatValue(getExcelValue(row, 'penghasilanIbu'), 'penghasilanIbu'),
+                hpIbu:            getExcelValue(row, 'hpIbu'),
+                tinggiBadan:      getExcelValue(row, 'tinggiBadan'),
+                beratBadan:       getExcelValue(row, 'beratBadan'),
+                anakKe:           getExcelValue(row, 'anakKe'),
+                jumlahSaudara:    getExcelValue(row, 'jumlahSaudara'),
+                golDarah:         formatValue(getExcelValue(row, 'golDarah'), 'golDarah')
               };
               newStudents.push(newStudent);
               importedCount++;
