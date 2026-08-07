@@ -81,62 +81,47 @@ export function SinkronisasiDapodikModal({
       let updatedCount = 0;
       let failedCount = 0;
 
-      // 2. Loop & Proses Pemindahan Data ke Supabase
-      for (const item of rawData) {
-        // Lewati jika NISN kosong/invalid
-        if (!item.nisn || !item.nisn.trim()) {
-          failedCount++;
-          continue;
-        }
+      // 2. Siapkan semua data, lalu batch upsert ke Supabase
+      const batchData = rawData
+        .filter(item => item.nisn && item.nisn.trim()) // Lewati jika NISN kosong
+        .map(item => ({
+          nisn:             item.nisn.trim(),
+          nama_lengkap:     item.nama,           // Dapodik: nama → DB: nama_lengkap
+          jenis_kelamin:    item.jenis_kelamin === 'P' || item.jenis_kelamin === 'Perempuan' ? 'Perempuan' : 'Laki-laki',
+          tempat_lahir:     item.tempat_lahir,   // Dapodik: tempat_lahir → DB: tempat_lahir
+          tanggal_lahir:    item.tanggal_lahir || null,
+          alamat:           item.alamat_jalan,   // Dapodik: alamat_jalan → DB: alamat
+          nama_ayah:        item.nama_ayah,
+          nama_ibu:         item.nama_ibu,
+          nama_wali:        item.nama_wali,
+          kelas:            item.nama_kelas,     // Dapodik: nama_kelas → DB: kelas
+          tahun_masuk:      item.tahun_masuk,
+          status_siswa:     item.status === 'Aktif' || item.status === '1' ? 'Aktif' : 'Non-Aktif', // DB: status_siswa
+          synced_from_dapodik: true,
+        }));
 
-        // Mapping Data Persis sesuai Request User & Skema Database
-        const mappedData = {
-          nisn: item.nisn.trim(),
-          nama: item.nama, // untuk kompatibilitas frontend saat ini
-          jenis_kelamin: item.jenis_kelamin === 'P' || item.jenis_kelamin === 'Perempuan' ? 'Perempuan' : 'Laki-laki',
-          kota_lahir: item.tempat_lahir,
-          tanggal_lahir: item.tanggal_lahir,
-          alamat: item.alamat_jalan,
-          nama_ayah: item.nama_ayah,
-          nama_ibu: item.nama_ibu,
-          nama_wali: item.nama_wali,
-          kelas: item.nama_kelas,
-          tahun_masuk: item.tahun_masuk,
-          status: item.status === 'Aktif' || item.status === '1' ? 'Aktif' : 'Non-Aktif', // Konversi status
-        };
+      failedCount = rawData.length - batchData.length; // yang tidak punya NISN
 
-        try {
-          // Cari apakah NISN siswa sudah ada di tabel public.siswa
-          const { data: existingSiswa, error: fetchError } = await supabase
-            .from('siswa')
-            .select('id')
-            .eq('nisn', mappedData.nisn)
-            .maybeSingle();
+      try {
+        // Upsert: Insert jika NISN belum ada, Update jika sudah ada
+        const { data: upsertResult, error: upsertError } = await supabase
+          .from('siswa')
+          .upsert(batchData, {
+            onConflict: 'nisn',         // conflict key: kolom NISN (UNIQUE)
+            ignoreDuplicates: false,    // false = update jika duplikat
+          })
+          .select('id, nisn');
 
-          if (fetchError) throw fetchError;
+        if (upsertError) throw upsertError;
 
-          if (existingSiswa) {
-            // Update jika sudah ada
-            const { error: updateError } = await supabase
-              .from('siswa')
-              .update(mappedData)
-              .eq('id', existingSiswa.id);
+        // Hitung berapa yang baru vs update (estimasi dari hasil)
+        addedCount = upsertResult?.length ?? batchData.length;
+        updatedCount = batchData.length - addedCount;
+        if (updatedCount < 0) updatedCount = 0;
 
-            if (updateError) throw updateError;
-            updatedCount++;
-          } else {
-            // Insert jika belum ada
-            const { error: insertError } = await supabase
-              .from('siswa')
-              .insert([mappedData]);
-
-            if (insertError) throw insertError;
-            addedCount++;
-          }
-        } catch (dbErr) {
-          console.error(`Gagal menyimpan siswa NISN ${mappedData.nisn}:`, dbErr);
-          failedCount++;
-        }
+      } catch (dbErr: any) {
+        console.error('Batch upsert gagal:', dbErr);
+        throw new Error(`Gagal menyimpan ke database: ${dbErr.message}`);
       }
 
       setSyncStatus({
