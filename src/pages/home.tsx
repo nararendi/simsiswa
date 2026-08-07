@@ -24,7 +24,7 @@ import { StudentFormModal } from '@/components/modals/StudentFormModal';
 import { StudentDetailModal } from '@/components/modals/StudentDetailModal';
 import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
 import { KelolaAdminModal } from '@/components/modals/KelolaAdminModal';
-import { SinkronisasiDapodikModal } from '@/components/modals/SinkronisasiDapodikModal';
+
 
 export default function Home() {
   const { toast } = useToast();
@@ -51,7 +51,7 @@ export default function Home() {
   const [modalDetailOpen, setModalDetailOpen] = useState(false);
   const [modalDeleteOpen, setModalDeleteOpen] = useState(false);
   const [modalAdminOpen, setModalAdminOpen] = useState(false);
-  const [modalDapodikOpen, setModalDapodikOpen] = useState(false);
+
   
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
@@ -298,10 +298,7 @@ export default function Home() {
                   <DropdownMenuItem onClick={() => setModalKelulusanOpen(true)}>
                     <GraduationCap className="mr-2 h-4 w-4" /> Kelulusan
                   </DropdownMenuItem>
-                  <div className="border-t my-1"></div>
-                  <DropdownMenuItem onClick={() => setModalDapodikOpen(true)} className="text-primary font-medium">
-                    <RefreshCw className="mr-2 h-4 w-4 text-primary animate-spin" style={{ animationDuration: '6s' }} /> Sinkron Dapodik
-                  </DropdownMenuItem>
+
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -504,11 +501,7 @@ export default function Home() {
         onClose={() => setModalAdminOpen(false)}
       />
 
-      <SinkronisasiDapodikModal 
-        isOpen={modalDapodikOpen}
-        onClose={() => setModalDapodikOpen(false)}
-        onSuccess={fetchStudents}
-      />
+
     </div>
   );
 }
