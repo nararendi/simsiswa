@@ -52,7 +52,7 @@ export default function Login() {
         </div>
         <div>
           <h1 className="font-bold text-xl leading-tight tracking-tight text-slate-100">SIM-SISWA</h1>
-          <p className="text-xs text-slate-400">Sistem Informasi Input & Manajemen Siswa</p>
+          <p className="text-xs text-slate-100">Sistem Informasi Input & Manajemen Siswa</p>
         </div>
       </div>
 

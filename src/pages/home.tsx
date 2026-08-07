@@ -164,8 +164,8 @@ export default function Home() {
               <Database className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="font-bold text-lg leading-tight tracking-tight">SIM-SISWA</h1>
-              <p className="text-xs text-primary-foreground/70 hidden sm:block">Sistem Informasi Input & Manajemen Data Siswa</p>
+              <h1 className="font-bold text-lg leading-tight tracking-tight text-slate-100">SIM-SISWA</h1>
+              <p className="text-xs text-slate-100 hidden sm:block">Sistem Informasi Input & Manajemen Data Siswa</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
