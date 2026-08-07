@@ -32,7 +32,7 @@ export default function Home() {
     students, classes, tahunAjaran, isLoaded,
     addStudent, updateStudent, deleteStudent, updateTahunAjaran,
     updateClasses, pindahKelas, luluskanSiswa, suggestNextClass,
-    importExcel, downloadExcelTemplate
+    importExcel, downloadExcelTemplate, syncClasses
   } = useStudents();
 
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
