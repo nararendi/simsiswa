@@ -45,21 +45,21 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-sans">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4 font-sans">
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 bg-primary text-primary-foreground rounded flex items-center justify-center shadow-md">
+        <div className="w-10 h-10 bg-indigo-600 text-white rounded flex items-center justify-center shadow-lg shadow-indigo-500/20">
           <Database className="w-6 h-6" />
         </div>
         <div>
-          <h1 className="font-bold text-xl leading-tight tracking-tight text-slate-900">SIM-SISWA</h1>
-          <p className="text-xs text-slate-500">Sistem Informasi Input & Manajemen Siswa</p>
+          <h1 className="font-bold text-xl leading-tight tracking-tight text-slate-100">SIM-SISWA</h1>
+          <p className="text-xs text-slate-400">Sistem Informasi Input & Manajemen Siswa</p>
         </div>
       </div>
 
-      <Card className="w-full max-w-md shadow-lg border-slate-200">
+      <Card className="w-full max-w-md shadow-2xl bg-slate-900 border-slate-800 text-slate-100">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold tracking-tight">Masuk ke SIM</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-2xl font-bold tracking-tight text-slate-100">Masuk ke SIM</CardTitle>
+          <CardDescription className="text-slate-400">
             Masukkan email dan password admin Anda
           </CardDescription>
         </CardHeader>
