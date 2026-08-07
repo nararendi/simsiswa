@@ -9,9 +9,10 @@ import {
   Users, UserCheck, User, Users2, Search, Filter, Calendar, Plus, 
   MoreVertical, FileSpreadsheet, Download, Upload, Database, 
   LayoutGrid, List, ChevronDown, CheckSquare, Settings, ArrowRightLeft,
-  ArrowUpCircle, GraduationCap, Eye, Edit, Trash2
+  ArrowUpCircle, GraduationCap, Eye, Edit, Trash2, LogOut
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useLocation } from 'wouter';
 
 // Import Modals
 import { TahunAjaranModal } from '@/components/modals/TahunAjaranModal';
@@ -22,9 +23,11 @@ import { KelulusanModal } from '@/components/modals/KelulusanModal';
 import { StudentFormModal } from '@/components/modals/StudentFormModal';
 import { StudentDetailModal } from '@/components/modals/StudentDetailModal';
 import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
+import { KelolaAdminModal } from '@/components/modals/KelolaAdminModal';
 
 export default function Home() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const {
     students, classes, tahunAjaran, isLoaded,
     addStudent, updateStudent, deleteStudent, updateTahunAjaran,
@@ -46,6 +49,7 @@ export default function Home() {
   const [modalFormOpen, setModalFormOpen] = useState(false);
   const [modalDetailOpen, setModalDetailOpen] = useState(false);
   const [modalDeleteOpen, setModalDeleteOpen] = useState(false);
+  const [modalAdminOpen, setModalAdminOpen] = useState(false);
   
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
@@ -148,6 +152,31 @@ export default function Home() {
               <Plus className="w-4 h-4 mr-2" />
               Tambah Siswa
             </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="hover:bg-primary-foreground/10 text-primary-foreground">
+                  <Settings className="w-5 h-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => setModalAdminOpen(true)}>
+                  <Settings className="w-4 h-4 mr-2" />
+                  Kelola Akun
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  className="text-rose-600 focus:text-rose-600 focus:bg-rose-50"
+                  onClick={() => {
+                    localStorage.removeItem('sim_auth_token');
+                    toast({ title: 'Logout Berhasil', description: 'Anda telah keluar dari sistem.' });
+                    setLocation('/login');
+                  }}
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Keluar / Log Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
@@ -483,6 +512,11 @@ export default function Home() {
             toast({ title: 'Terhapus', description: `Data siswa ${selectedStudent.nama} berhasil dihapus.` });
           }
         }}
+      />
+
+      <KelolaAdminModal 
+        isOpen={modalAdminOpen}
+        onClose={() => setModalAdminOpen(false)}
       />
     </div>
   );
