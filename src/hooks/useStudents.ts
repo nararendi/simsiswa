@@ -567,7 +567,35 @@ export function useStudents() {
           });
 
           if (importedCount > 0) {
-            await saveStudents([...newStudents, ...students]);
+            // Upsert: timpa data yang sudah ada (NISN sama), tambah yang baru
+            const updatedStudents = [...students];
+
+            for (const incoming of newStudents) {
+              const existingIndex = updatedStudents.findIndex(
+                s => s.nisn && s.nisn === incoming.nisn
+              );
+              if (existingIndex >= 0) {
+                // Pertahankan ID asli agar Supabase bisa update row yang sama
+                updatedStudents[existingIndex] = {
+                  ...incoming,
+                  id: updatedStudents[existingIndex].id,
+                };
+              } else {
+                updatedStudents.unshift(incoming);
+              }
+            }
+
+            // Simpan ke state dan Supabase
+            setStudents(updatedStudents);
+            localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updatedStudents));
+            syncClasses(updatedStudents);
+
+            // Upsert ke Supabase (conflict pada kolom nisn)
+            const dbRows = updatedStudents.map(mapStudentToDb);
+            const { error } = await supabase
+              .from('siswa')
+              .upsert(dbRows, { onConflict: 'nisn' });
+            if (error) console.error('Upsert Excel import error:', error);
           }
           resolve(importedCount);
         } catch (error) {
