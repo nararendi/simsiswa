@@ -32,7 +32,7 @@ export default function Home() {
     students, classes, tahunAjaran, isLoaded,
     addStudent, updateStudent, deleteStudent, updateTahunAjaran,
     updateClasses, pindahKelas, luluskanSiswa, suggestNextClass,
-    syncClasses, importExcel, downloadExcelTemplate, exportCSV, backupJSON, restoreJSON
+    importExcel, downloadExcelTemplate
   } = useStudents();
 
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
@@ -54,7 +54,6 @@ export default function Home() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
   const fileInputExcelRef = useRef<HTMLInputElement>(null);
-  const fileInputJSONRef = useRef<HTMLInputElement>(null);
 
   // Derived Stats
   const stats = useMemo(() => {
@@ -93,18 +92,6 @@ export default function Home() {
       toast({ variant: 'destructive', title: 'Import Gagal', description: 'Pastikan format file Excel sesuai template.' });
     }
     if (fileInputExcelRef.current) fileInputExcelRef.current.value = '';
-  };
-
-  const handleJSONRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const count = await restoreJSON(file);
-      toast({ title: 'Restore Berhasil', description: `${count} data siswa berhasil dipulihkan.` });
-    } catch (err) {
-      toast({ variant: 'destructive', title: 'Restore Gagal', description: 'File JSON tidak valid.' });
-    }
-    if (fileInputJSONRef.current) fileInputJSONRef.current.value = '';
   };
 
   const getStatusBadge = (status: string) => {
@@ -312,7 +299,7 @@ export default function Home() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-2">
-                    <FileSpreadsheet className="w-4 h-4" /> Impor / Ekspor <ChevronDown className="w-3 h-3" />
+                    <FileSpreadsheet className="w-4 h-4" /> Impor Excel <ChevronDown className="w-3 h-3" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
@@ -322,20 +309,9 @@ export default function Home() {
                   <DropdownMenuItem onClick={() => fileInputExcelRef.current?.click()}>
                     <Upload className="mr-2 h-4 w-4" /> Impor dari Excel
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={exportCSV}>
-                    <Download className="mr-2 h-4 w-4" /> Ekspor ke CSV
-                  </DropdownMenuItem>
-                  <div className="border-t my-1"></div>
-                  <DropdownMenuItem onClick={backupJSON}>
-                    <Download className="mr-2 h-4 w-4" /> Backup Database (JSON)
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => fileInputJSONRef.current?.click()}>
-                    <Upload className="mr-2 h-4 w-4 text-destructive" /> Restore Database (JSON)
-                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               <input type="file" ref={fileInputExcelRef} className="hidden" accept=".xlsx, .xls" onChange={handleExcelImport} />
-              <input type="file" ref={fileInputJSONRef} className="hidden" accept=".json" onChange={handleJSONRestore} />
             </div>
           </div>
         </div>

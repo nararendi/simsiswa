@@ -369,58 +369,6 @@ export function useStudents() {
     writeFile(wb, "Template_Import_Data_Siswa.xlsx");
   };
 
-  const exportCSV = () => {
-    const header = Object.keys(students[0] || initialDemoStudents[0]).join(',');
-    const rows = students.map(student => {
-      return Object.values(student).map(val => `"${String(val).replace(/"/g, '""')}"`).join(',');
-    });
-    
-    // Add BOM for Excel UTF-8 compatibility
-    const csvString = '\\uFEFF' + [header, ...rows].join('\\n');
-    
-    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `Data_Siswa_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const backupJSON = () => {
-    const dataStr = JSON.stringify(students, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `Backup_Data_Siswa_${new Date().toISOString().split('T')[0]}.json`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const restoreJSON = async (file: File): Promise<number> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const json = JSON.parse(e.target?.result as string);
-          if (Array.isArray(json)) {
-            saveStudents(json);
-            resolve(json.length);
-          } else {
-            reject(new Error("Invalid JSON format. Expected an array of students."));
-          }
-        } catch (error) {
-          reject(error);
-        }
-      };
-      reader.onerror = (error) => reject(error);
-      reader.readAsText(file);
-    });
-  };
-
   return {
     students,
     classes,
@@ -436,9 +384,6 @@ export function useStudents() {
     suggestNextClass,
     importExcel,
     downloadExcelTemplate,
-    exportCSV,
-    backupJSON,
-    restoreJSON,
     syncClasses: () => syncClasses(students)
   };
 }
