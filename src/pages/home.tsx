@@ -41,7 +41,7 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterKelas, setFilterKelas] = useState('Semua');
-  const [filterStatus, setFilterStatus] = useState('Semua');
+  const [filterStatus, setFilterStatus] = useState('Aktif');
   
   // Modals state
   const [modalTahunOpen, setModalTahunOpen] = useState(false);
@@ -80,7 +80,7 @@ export default function Home() {
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
       const matchKelas = filterKelas === 'Semua' || s.kelas === filterKelas;
-      const matchStatus = filterStatus === 'Semua' || s.status === filterStatus;
+      const matchStatus = filterStatus === 'Semua' ? (s.status === 'Aktif') : s.status === filterStatus;
       const term = searchTerm.toLowerCase();
       const matchSearch = !term || (
         s.nama.toLowerCase().includes(term) ||
@@ -218,49 +218,7 @@ export default function Home() {
 
       <main className="container mx-auto px-4 py-6 flex-1 flex flex-col gap-6">
         
-        {/* STATS ROW */}
-        {/* STATS ROW */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4 cursor-pointer hover:border-indigo-300 transition-colors" onClick={() => setFilterStatus('Semua')}>
-            <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
-              <Users className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-sm text-slate-500 font-medium">Total Siswa</p>
-              <h3 className="text-2xl font-bold font-mono text-slate-800">{stats.total}</h3>
-            </div>
-          </div>
-          
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4 cursor-pointer hover:border-emerald-300 transition-colors" onClick={() => setFilterStatus('Aktif')}>
-            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-              <UserCheck className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-sm text-slate-500 font-medium">Siswa Aktif</p>
-              <h3 className="text-2xl font-bold font-mono text-slate-800">{stats.aktif}</h3>
-            </div>
-          </div>
 
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4 cursor-pointer hover:border-sky-300 transition-colors" onClick={() => setFilterStatus('Alumni')}>
-            <div className="w-12 h-12 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
-              <GraduationCap className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-sm text-slate-500 font-medium">Alumni</p>
-              <h3 className="text-2xl font-bold font-mono text-slate-800">{stats.alumni}</h3>
-            </div>
-          </div>
-
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4 cursor-pointer hover:border-rose-300 transition-colors" onClick={() => setFilterStatus('Non-Aktif')}>
-            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
-              <LogOut className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-sm text-slate-500 font-medium">Non-Aktif</p>
-              <h3 className="text-2xl font-bold font-mono text-slate-800">{stats.nonAktif}</h3>
-            </div>
-          </div>
-        </div>
 
         {/* NAVIGATION TABS */}
         <div className="flex border-b border-slate-200 gap-2 overflow-x-auto pb-px">
@@ -320,7 +278,7 @@ export default function Home() {
             <Users className="w-4 h-4" />
             Semua Data
             <Badge variant="secondary" className="ml-1 bg-slate-200 text-slate-700 font-mono">
-              {stats.total}
+              {stats.aktif}
             </Badge>
           </button>
         </div>
