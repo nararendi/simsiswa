@@ -1,14 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase Environment Variables (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY)');
-}
+export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey);
 
-// 1. Inisialisasi Supabase Client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// 1. Inisialisasi Supabase Client dengan fallback agar tidak crash saat load module
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder-url.supabase.co',
+  supabaseAnonKey || 'placeholder-key'
+);
 
 // Definisi interface data siswa (opsional, sesuaikan dengan skema tabel Supabase Anda)
 export interface Siswa {
