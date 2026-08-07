@@ -156,12 +156,38 @@ export function NaikKelasModal({
                           <Lock className="w-3 h-3" /> Tingkat akhir (Gunakan menu Kelulusan)
                         </div>
                       ) : (
-                        <Input 
-                          value={targetClassesMap[stat.className] || ''}
-                          onChange={(e) => setTargetClassesMap(prev => ({...prev, [stat.className]: e.target.value}))}
-                          className="h-8 max-w-xs"
-                          placeholder="Nama kelas tujuan..."
-                        />
+                        <div className="flex flex-col sm:flex-row gap-2 items-center max-w-md">
+                          {/* Dropdown Pilihan Kelas Registered */}
+                          <select
+                            className="h-8 text-xs border rounded-md px-2 bg-background w-full sm:w-44 focus:outline-none focus:ring-1 focus:ring-primary"
+                            value={classes.includes(targetClassesMap[stat.className]) ? targetClassesMap[stat.className] : (targetClassesMap[stat.className] ? 'custom' : '')}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val !== 'custom' && val !== '') {
+                                setTargetClassesMap(prev => ({...prev, [stat.className]: val}));
+                              }
+                            }}
+                          >
+                            <option value="">-- Pilih Kelas --</option>
+                            {suggestNextClass(stat.className) && !classes.includes(suggestNextClass(stat.className)) && (
+                              <option value={suggestNextClass(stat.className)}>
+                                ✨ {suggestNextClass(stat.className)} (Rekomendasi)
+                              </option>
+                            )}
+                            {classes.map(c => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                            <option value="custom">✍️ Ketik Nama Baru...</option>
+                          </select>
+
+                          {/* Input manual untuk mengetik / mengedit nama kelas */}
+                          <Input 
+                            value={targetClassesMap[stat.className] || ''}
+                            onChange={(e) => setTargetClassesMap(prev => ({...prev, [stat.className]: e.target.value}))}
+                            className="h-8 text-xs flex-1"
+                            placeholder="Ketik/sesuaikan kelas..."
+                          />
+                        </div>
                       )}
                     </td>
                   </tr>

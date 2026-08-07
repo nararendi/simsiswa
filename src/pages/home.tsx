@@ -69,6 +69,8 @@ export default function Home() {
     return {
       total: students.length,
       aktif: students.filter(s => s.status === 'Aktif').length,
+      alumni: students.filter(s => s.status === 'Alumni').length,
+      nonAktif: students.filter(s => s.status === 'Non-Aktif' || s.status === 'Pindah').length,
       laki: students.filter(s => s.jenisKelamin === 'Laki-laki').length,
       perempuan: students.filter(s => s.jenisKelamin === 'Perempuan').length
     };
@@ -217,8 +219,9 @@ export default function Home() {
       <main className="container mx-auto px-4 py-6 flex-1 flex flex-col gap-6">
         
         {/* STATS ROW */}
+        {/* STATS ROW */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4 cursor-pointer hover:border-indigo-300 transition-colors" onClick={() => setFilterStatus('Semua')}>
             <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
               <Users className="w-6 h-6" />
             </div>
@@ -228,7 +231,7 @@ export default function Home() {
             </div>
           </div>
           
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4 cursor-pointer hover:border-emerald-300 transition-colors" onClick={() => setFilterStatus('Aktif')}>
             <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
               <UserCheck className="w-6 h-6" />
             </div>
@@ -238,25 +241,88 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4 cursor-pointer hover:border-sky-300 transition-colors" onClick={() => setFilterStatus('Alumni')}>
             <div className="w-12 h-12 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
-              <User className="w-6 h-6" />
+              <GraduationCap className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm text-slate-500 font-medium">Laki-laki</p>
-              <h3 className="text-2xl font-bold font-mono text-slate-800">{stats.laki}</h3>
+              <p className="text-sm text-slate-500 font-medium">Alumni</p>
+              <h3 className="text-2xl font-bold font-mono text-slate-800">{stats.alumni}</h3>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center shrink-0">
-              <Users2 className="w-6 h-6" />
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4 cursor-pointer hover:border-rose-300 transition-colors" onClick={() => setFilterStatus('Non-Aktif')}>
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+              <LogOut className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm text-slate-500 font-medium">Perempuan</p>
-              <h3 className="text-2xl font-bold font-mono text-slate-800">{stats.perempuan}</h3>
+              <p className="text-sm text-slate-500 font-medium">Non-Aktif</p>
+              <h3 className="text-2xl font-bold font-mono text-slate-800">{stats.nonAktif}</h3>
             </div>
           </div>
+        </div>
+
+        {/* NAVIGATION TABS */}
+        <div className="flex border-b border-slate-200 gap-2 overflow-x-auto pb-px">
+          <button
+            onClick={() => setFilterStatus('Aktif')}
+            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
+              filterStatus === 'Aktif'
+                ? 'border-emerald-600 text-emerald-600 bg-emerald-50/50 rounded-t-lg'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+            }`}
+          >
+            <UserCheck className="w-4 h-4" />
+            Siswa Aktif
+            <Badge variant="secondary" className="ml-1 bg-emerald-100 text-emerald-800 hover:bg-emerald-100 font-mono">
+              {stats.aktif}
+            </Badge>
+          </button>
+
+          <button
+            onClick={() => setFilterStatus('Alumni')}
+            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
+              filterStatus === 'Alumni'
+                ? 'border-blue-600 text-blue-600 bg-blue-50/50 rounded-t-lg'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+            }`}
+          >
+            <GraduationCap className="w-4 h-4" />
+            Alumni
+            <Badge variant="secondary" className="ml-1 bg-blue-100 text-blue-800 hover:bg-blue-100 font-mono">
+              {stats.alumni}
+            </Badge>
+          </button>
+
+          <button
+            onClick={() => setFilterStatus('Non-Aktif')}
+            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
+              filterStatus === 'Non-Aktif'
+                ? 'border-rose-600 text-rose-600 bg-rose-50/50 rounded-t-lg'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+            }`}
+          >
+            <LogOut className="w-4 h-4" />
+            Siswa Non-Aktif
+            <Badge variant="secondary" className="ml-1 bg-rose-100 text-rose-800 hover:bg-rose-100 font-mono">
+              {stats.nonAktif}
+            </Badge>
+          </button>
+
+          <button
+            onClick={() => setFilterStatus('Semua')}
+            className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
+              filterStatus === 'Semua'
+                ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50 rounded-t-lg'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            Semua Data
+            <Badge variant="secondary" className="ml-1 bg-slate-200 text-slate-700 font-mono">
+              {stats.total}
+            </Badge>
+          </button>
         </div>
 
         {/* SEARCH & FILTERS PANEL */}
@@ -386,6 +452,9 @@ export default function Home() {
                       <th className="px-4 py-3 font-semibold text-center text-slate-600">L/P</th>
                       <th className="px-4 py-3 font-semibold text-center text-slate-600">Kelas</th>
                       <th className="px-4 py-3 font-semibold text-center text-slate-600">Status</th>
+                      {(filterStatus === 'Non-Aktif' || filterStatus === 'Semua') && (
+                        <th className="px-4 py-3 font-semibold text-left text-slate-600">Keterangan Keluar</th>
+                      )}
                       <th className="px-4 py-3 font-semibold text-right text-slate-600">Aksi</th>
                     </tr>
                   </thead>
@@ -412,6 +481,25 @@ export default function Home() {
                         <td className="px-4 py-3 text-center">
                           {getStatusBadge(student.status)}
                         </td>
+                        {(filterStatus === 'Non-Aktif' || filterStatus === 'Semua') && (
+                          <td className="px-4 py-3 text-left text-xs">
+                            {student.status === 'Non-Aktif' || student.status === 'Pindah' ? (
+                              <div className="space-y-0.5">
+                                {student.alasanKeluar && (
+                                  <p className="font-semibold text-rose-700">{student.alasanKeluar}</p>
+                                )}
+                                {student.tanggalKeluar && (
+                                  <p className="text-slate-500 font-mono">Tgl: {student.tanggalKeluar}</p>
+                                )}
+                                {!student.alasanKeluar && !student.tanggalKeluar && (
+                                  <span className="text-slate-400 font-italic">-</span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+                          </td>
+                        )}
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                             <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setSelectedStudent(student); setModalDetailOpen(true); }}>
