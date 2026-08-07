@@ -117,21 +117,27 @@ export function SinkronisasiDapodikModal({
       // 2. Siapkan semua data, lalu batch upsert ke Supabase
       const batchData = rawData
         .filter(item => item.nisn && item.nisn.trim()) // Lewati jika NISN kosong
-        .map(item => ({
-          nisn:             item.nisn.trim(),
-          nama_lengkap:     item.nama,           // Dapodik: nama → DB: nama_lengkap
-          jenis_kelamin:    item.jenis_kelamin === 'P' || item.jenis_kelamin === 'Perempuan' ? 'Perempuan' : 'Laki-laki',
-          tempat_lahir:     item.tempat_lahir,   // Dapodik: tempat_lahir → DB: tempat_lahir
-          tanggal_lahir:    item.tanggal_lahir || null,
-          alamat:           item.alamat_jalan,   // Dapodik: alamat_jalan → DB: alamat
-          nama_ayah:        item.nama_ayah,
-          nama_ibu:         item.nama_ibu,
-          nama_wali:        item.nama_wali,
-          kelas:            item.nama_kelas,     // Dapodik: nama_kelas → DB: kelas
-          tahun_masuk:      item.tahun_masuk,
-          status_siswa:     item.status === 'Aktif' || item.status === '1' ? 'Aktif' : 'Non-Aktif', // DB: status_siswa
-          synced_from_dapodik: true,
-        }));
+        .map(item => {
+          const namaLengkap = item.nama || '';
+          const statusSiswa = item.status === 'Aktif' || item.status === '1' ? 'Aktif' : 'Non-Aktif';
+          return {
+            nisn:                item.nisn.trim(),
+            nama:                namaLengkap,          // kolom lama (NOT NULL) — wajib diisi
+            nama_lengkap:        namaLengkap,          // kolom baru
+            jenis_kelamin:       item.jenis_kelamin === 'P' || item.jenis_kelamin === 'Perempuan' ? 'Perempuan' : 'Laki-laki',
+            tempat_lahir:        item.tempat_lahir  || null,
+            tanggal_lahir:       item.tanggal_lahir || null,
+            alamat:              item.alamat_jalan  || null,
+            nama_ayah:           item.nama_ayah     || null,
+            nama_ibu:            item.nama_ibu      || null,
+            nama_wali:           item.nama_wali     || null,
+            kelas:               item.nama_kelas    || null,
+            tahun_masuk:         item.tahun_masuk   || null,
+            status:              statusSiswa,          // kolom lama (jika masih ada)
+            status_siswa:        statusSiswa,          // kolom baru
+            synced_from_dapodik: true,
+          };
+        });
 
       failedCount = rawData.length - batchData.length; // yang tidak punya NISN
 
