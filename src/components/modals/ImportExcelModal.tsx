@@ -53,7 +53,7 @@ export function ImportExcelModal({
               <SelectTrigger id="sheet-select">
                 <SelectValue placeholder="Pilih sheet..." />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-60 overflow-y-auto">
                 {sheetNames.map(name => (
                   <SelectItem key={name} value={name}>
                     {name}
