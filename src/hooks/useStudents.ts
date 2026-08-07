@@ -42,6 +42,9 @@ export interface Student {
   anakKe: string;
   jumlahSaudara: string;
   golDarah: string;
+  // Soft delete fields
+  tanggalKeluar?: string;
+  alasanKeluar?: string;
 }
 
 const STORAGE_KEY_STUDENTS = 'sim_siswa_data';
@@ -92,6 +95,8 @@ export function mapDbToStudent(row: any): Student {
     anakKe: row.anak_ke || '',
     jumlahSaudara: row.jumlah_saudara || '',
     golDarah: row.gol_darah || '',
+    tanggalKeluar: row.tanggal_keluar || '',
+    alasanKeluar: row.alasan_keluar || '',
   };
 }
 
@@ -150,6 +155,8 @@ export function mapStudentToDb(student: Partial<Student>): any {
   if (student.anakKe !== undefined) result.anak_ke = student.anakKe;
   if (student.jumlahSaudara !== undefined) result.jumlah_saudara = student.jumlahSaudara;
   if (student.golDarah !== undefined) result.gol_darah = student.golDarah;
+  if (student.tanggalKeluar !== undefined) result.tanggal_keluar = student.tanggalKeluar || null;
+  if (student.alasanKeluar !== undefined) result.alasan_keluar = student.alasanKeluar;
   
   return result;
 }
@@ -283,9 +290,14 @@ export function useStudents() {
     }
   };
 
-  const deleteStudent = async (id: string) => {
+  // Soft delete: ubah status ke Non-Aktif + catat tanggal & alasan keluar
+  const deleteStudent = async (id: string, alasan: string, tanggal: string) => {
     const studentObj = students.find(s => s.id === id);
-    const updated = students.filter((s) => s.id !== id);
+    const updated = students.map(s =>
+      s.id === id
+        ? { ...s, status: 'Non-Aktif' as const, tanggalKeluar: tanggal, alasanKeluar: alasan }
+        : s
+    );
     setStudents(updated);
     localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updated));
     syncClasses(updated);
@@ -293,7 +305,12 @@ export function useStudents() {
     try {
       if (studentObj) {
         const queryId = uuidRegex.test(id) ? id : null;
-        let query = supabase.from('siswa').delete();
+        const updatePayload = {
+          status_siswa: 'Non-Aktif',
+          tanggal_keluar: tanggal || null,
+          alasan_keluar: alasan,
+        };
+        let query = supabase.from('siswa').update(updatePayload);
 
         if (queryId && studentObj.nisn) {
           query = query.or(`id.eq.${queryId},nisn.eq.${studentObj.nisn}`);
@@ -302,14 +319,14 @@ export function useStudents() {
         } else if (studentObj.nisn) {
           query = query.eq('nisn', studentObj.nisn);
         } else {
-          throw new Error('No unique identifier found to delete student');
+          throw new Error('No unique identifier found to deactivate student');
         }
 
         const { error } = await query;
         if (error) throw error;
       }
     } catch (err) {
-      console.error('Failed to delete student from Supabase:', err);
+      console.error('Failed to deactivate student in Supabase:', err);
     }
   };
 

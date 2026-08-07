@@ -488,10 +488,10 @@ export default function Home() {
         isOpen={modalDeleteOpen} 
         onClose={() => setModalDeleteOpen(false)}
         studentName={selectedStudent?.nama || ''}
-        onConfirm={() => {
+        onConfirm={(alasan, tanggal) => {
           if (selectedStudent) {
-            deleteStudent(selectedStudent.id);
-            toast({ title: 'Terhapus', description: `Data siswa ${selectedStudent.nama} berhasil dihapus.` });
+            deleteStudent(selectedStudent.id, alasan, tanggal);
+            toast({ title: 'Siswa Di-non-aktifkan', description: `${selectedStudent.nama} telah dipindahkan ke daftar Non-Aktif. Alasan: ${alasan}.` });
           }
         }}
       />
