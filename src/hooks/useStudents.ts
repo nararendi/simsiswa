@@ -491,26 +491,12 @@ export function useStudents() {
             return '';
           };
 
-          // Helper perapih teks (Title Case untuk nama/tempat, Upper Case untuk NIK/NISN)
+          // Helper format data: Hanya nama siswa yang diubah ke UPPERCASE, yang lain dibiarkan apa adanya
           const formatValue = (val: string, fieldKey: string): string => {
             if (!val) return '';
             
-            const uppercaseKeys = ['nisn', 'nis', 'nik', 'rt', 'rw', 'kodePos', 'noKk', 'nikAyah', 'nikIbu', 'golDarah'];
-            if (uppercaseKeys.includes(fieldKey)) {
+            if (fieldKey === 'nama') {
               return val.toUpperCase();
-            }
-
-            const titleCaseKeys = [
-              'nama', 'asalSekolah', 'kotaLahir', 'alamat', 'kelurahan', 'kecamatan', 
-              'namaAyah', 'pendidikanAyah', 'pekerjaanAyah', 'namaIbu', 'pendidikanIbu', 
-              'pekerjaanIbu', 'agama', 'kelas'
-            ];
-            if (titleCaseKeys.includes(fieldKey)) {
-              return val
-                .toLowerCase()
-                .split(' ')
-                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                .join(' ');
             }
 
             return val;
