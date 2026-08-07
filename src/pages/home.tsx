@@ -24,6 +24,7 @@ import { StudentFormModal } from '@/components/modals/StudentFormModal';
 import { StudentDetailModal } from '@/components/modals/StudentDetailModal';
 import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
 import { KelolaAdminModal } from '@/components/modals/KelolaAdminModal';
+import { SinkronisasiDapodikModal } from '@/components/modals/SinkronisasiDapodikModal';
 
 export default function Home() {
   const { toast } = useToast();
@@ -50,6 +51,7 @@ export default function Home() {
   const [modalDetailOpen, setModalDetailOpen] = useState(false);
   const [modalDeleteOpen, setModalDeleteOpen] = useState(false);
   const [modalAdminOpen, setModalAdminOpen] = useState(false);
+  const [modalDapodikOpen, setModalDapodikOpen] = useState(false);
   
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
@@ -181,6 +183,7 @@ export default function Home() {
               <h3 className="text-2xl font-bold font-mono text-slate-800">{stats.total}</h3>
             </div>
           </div>
+          
           <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
               <UserCheck className="w-6 h-6" />
@@ -190,15 +193,17 @@ export default function Home() {
               <h3 className="text-2xl font-bold font-mono text-slate-800">{stats.aktif}</h3>
             </div>
           </div>
+
           <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+            <div className="w-12 h-12 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
               <User className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm text-slate-500 font-medium">Laki-Laki</p>
+              <p className="text-sm text-slate-500 font-medium">Laki-laki</p>
               <h3 className="text-2xl font-bold font-mono text-slate-800">{stats.laki}</h3>
             </div>
           </div>
+
           <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center shrink-0">
               <Users2 className="w-6 h-6" />
@@ -210,8 +215,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* TOOLBAR PANEL */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col gap-4">
+        {/* SEARCH & FILTERS PANEL */}
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-4">
           <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
             <div className="flex flex-1 flex-col sm:flex-row gap-3 w-full">
               <div className="relative flex-1">
@@ -293,6 +298,10 @@ export default function Home() {
                   <DropdownMenuItem onClick={() => setModalKelulusanOpen(true)}>
                     <GraduationCap className="mr-2 h-4 w-4" /> Kelulusan
                   </DropdownMenuItem>
+                  <div className="border-t my-1"></div>
+                  <DropdownMenuItem onClick={() => setModalDapodikOpen(true)} className="text-primary font-medium">
+                    <RefreshCw className="mr-2 h-4 w-4 text-primary animate-spin" style={{ animationDuration: '6s' }} /> Sinkron Dapodik
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -364,13 +373,13 @@ export default function Home() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-600 hover:text-primary hover:bg-primary/10" onClick={() => { setSelectedStudent(student); setModalDetailOpen(true); }}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setSelectedStudent(student); setModalDetailOpen(true); }}>
                               <Eye className="w-4 h-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-600 hover:text-amber-600 hover:bg-amber-50" onClick={() => { setSelectedStudent(student); setModalFormOpen(true); }}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-amber-600 hover:bg-amber-50" onClick={() => { setSelectedStudent(student); setModalFormOpen(true); }}>
                               <Edit className="w-4 h-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-600 hover:text-destructive hover:bg-destructive/10" onClick={() => { setSelectedStudent(student); setModalDeleteOpen(true); }}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive hover:bg-destructive/10" onClick={() => { setSelectedStudent(student); setModalDeleteOpen(true); }}>
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
@@ -381,9 +390,9 @@ export default function Home() {
                 </table>
               </div>
             ) : (
-              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-4">
                 {filteredStudents.map((student) => (
-                  <div key={student.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-white flex flex-col group relative">
+                  <div key={student.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col hover:border-primary/50 transition-colors relative group">
                     <div className="absolute top-3 right-3">
                       {getStatusBadge(student.status)}
                     </div>
@@ -391,10 +400,10 @@ export default function Home() {
                     <div className="flex gap-3 mb-3 items-start pr-16">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-bold text-sm
                         ${student.jenisKelamin === 'Laki-laki' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}`}>
-                        {student.nama.substring(0, 2).toUpperCase()}
+                        {student.nama.charAt(0)}
                       </div>
                       <div>
-                        <h4 className="font-semibold text-slate-800 leading-tight line-clamp-2">{student.nama}</h4>
+                        <h4 className="font-semibold text-slate-800 line-clamp-1">{student.nama}</h4>
                         <p className="text-xs text-slate-500 font-mono mt-1">{student.nisn}</p>
                       </div>
                     </div>
@@ -493,6 +502,11 @@ export default function Home() {
       <KelolaAdminModal 
         isOpen={modalAdminOpen}
         onClose={() => setModalAdminOpen(false)}
+      />
+
+      <SinkronisasiDapodikModal 
+        isOpen={modalDapodikOpen}
+        onClose={() => setModalDapodikOpen(false)}
       />
     </div>
   );

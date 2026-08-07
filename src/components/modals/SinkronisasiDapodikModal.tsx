@@ -1,0 +1,245 @@
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { RefreshCw, Key, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+
+// Definisi interface raw data dari Dapodik Web Service
+interface DapodikPesertaDidik {
+  nisn: string;
+  nama: string;
+  jenis_kelamin: string;
+  tempat_lahir: string;
+  tanggal_lahir: string;
+  alamat_jalan: string;
+  nama_ayah: string;
+  nama_ibu: string;
+  nama_wali: string;
+  nama_kelas: string;
+  tahun_masuk: string;
+  status: string;
+}
+
+export function SinkronisasiDapodikModal({
+  isOpen,
+  onClose,
+  onSuccess,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
+}) {
+  const { toast } = useToast();
+  const [token, setToken] = useState(() => localStorage.getItem('dapodik_token') || '');
+  const [isLoading, setIsLoading] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<{
+    success: boolean;
+    added: number;
+    updated: number;
+    failed: number;
+    message: string;
+  } | null>(null);
+
+  const handleSync = async () => {
+    if (!token.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Token Kosong',
+        description: 'Silakan masukkan token Web Service Dapodik terlebih dahulu.',
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    setSyncStatus(null);
+    localStorage.setItem('dapodik_token', token.trim());
+
+    try {
+      // 1. Ambil data dari Web Service Dapodik lokal
+      const response = await fetch('http://localhost:5774/rest/PesertaDidik', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token.trim()}`,
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Dapodik Error: ${response.statusText} (${response.status})`);
+      }
+
+      const rawData: DapodikPesertaDidik[] = await response.json();
+
+      if (!Array.isArray(rawData) || rawData.length === 0) {
+        throw new Error('Data peserta didik tidak ditemukan atau kosong.');
+      }
+
+      let addedCount = 0;
+      let updatedCount = 0;
+      let failedCount = 0;
+
+      // 2. Loop & Proses Pemindahan Data ke Supabase
+      for (const item of rawData) {
+        // Lewati jika NISN kosong/invalid
+        if (!item.nisn || !item.nisn.trim()) {
+          failedCount++;
+          continue;
+        }
+
+        // Mapping Data Persis sesuai Request User & Skema Database
+        const mappedData = {
+          nisn: item.nisn.trim(),
+          nama: item.nama, // untuk kompatibilitas frontend saat ini
+          jenis_kelamin: item.jenis_kelamin === 'P' || item.jenis_kelamin === 'Perempuan' ? 'Perempuan' : 'Laki-laki',
+          kota_lahir: item.tempat_lahir,
+          tanggal_lahir: item.tanggal_lahir,
+          alamat: item.alamat_jalan,
+          nama_ayah: item.nama_ayah,
+          nama_ibu: item.nama_ibu,
+          nama_wali: item.nama_wali,
+          kelas: item.nama_kelas,
+          tahun_masuk: item.tahun_masuk,
+          status: item.status === 'Aktif' || item.status === '1' ? 'Aktif' : 'Non-Aktif', // Konversi status
+        };
+
+        try {
+          // Cari apakah NISN siswa sudah ada di tabel public.siswa
+          const { data: existingSiswa, error: fetchError } = await supabase
+            .from('siswa')
+            .select('id')
+            .eq('nisn', mappedData.nisn)
+            .maybeSingle();
+
+          if (fetchError) throw fetchError;
+
+          if (existingSiswa) {
+            // Update jika sudah ada
+            const { error: updateError } = await supabase
+              .from('siswa')
+              .update(mappedData)
+              .eq('id', existingSiswa.id);
+
+            if (updateError) throw updateError;
+            updatedCount++;
+          } else {
+            // Insert jika belum ada
+            const { error: insertError } = await supabase
+              .from('siswa')
+              .insert([mappedData]);
+
+            if (insertError) throw insertError;
+            addedCount++;
+          }
+        } catch (dbErr) {
+          console.error(`Gagal menyimpan siswa NISN ${mappedData.nisn}:`, dbErr);
+          failedCount++;
+        }
+      }
+
+      setSyncStatus({
+        success: true,
+        added: addedCount,
+        updated: updatedCount,
+        failed: failedCount,
+        message: `Sinkronisasi berhasil! ${addedCount} data baru ditambahkan, ${updatedCount} diperbarui.`,
+      });
+
+      if (onSuccess) onSuccess();
+
+    } catch (err: any) {
+      console.error('Proses Sinkronisasi Dapodik Gagal:', err);
+      setSyncStatus({
+        success: false,
+        added: 0,
+        updated: 0,
+        failed: 0,
+        message: err.message || 'Terjadi kesalahan saat menghubungi API Dapodik lokal atau database Supabase.',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <RefreshCw className="w-5 h-5 text-primary animate-spin" style={{ animationDuration: '3s' }} />
+            Sinkronisasi Dapodik lokal
+          </DialogTitle>
+          <DialogDescription>
+            Hubungkan data siswa dari aplikasi Dapodik lokal (port 5774) langsung ke database server.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-3">
+          {/* Peringatan Sebelum Mulai */}
+          <div className="bg-amber-50 border border-amber-200 text-amber-900 p-3 rounded-lg flex gap-3 text-sm">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="font-semibold">PERINGATAN SEBELUM MULAI:</span>
+              <ul className="list-disc list-inside space-y-1 text-amber-800 text-xs">
+                <li>Pastikan aplikasi Dapodik di komputer lokal sekolah ini sedang aktif/running.</li>
+                <li>Gunakan Token Web Service yang valid dari pengaturan Dapodik Anda.</li>
+                <li>Proses ini akan mencocokkan NISN. Data lokal yang sesuai akan diperbarui, sisanya ditambahkan.</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Input Token */}
+          <div className="space-y-2">
+            <Label htmlFor="dapodik-token" className="text-slate-700 font-medium">Token Web Service Dapodik</Label>
+            <div className="relative">
+              <Key className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+              <Input
+                id="dapodik-token"
+                type="password"
+                placeholder="Masukkan token Web Service Dapodik Anda"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                className="pl-10"
+                disabled={isLoading}
+              />
+            </div>
+          </div>
+
+          {/* Menampilkan Status Sinkronisasi */}
+          {syncStatus && (
+            <div className={`p-4 rounded-lg border flex gap-3 text-sm ${syncStatus.success ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
+              {syncStatus.success ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              ) : (
+                <XCircle className="w-5 h-5 text-rose-600 shrink-0" />
+              )}
+              <div className="space-y-1">
+                <span className="font-bold">{syncStatus.success ? 'Berhasil' : 'Gagal'}</span>
+                <p className="text-xs">{syncStatus.message}</p>
+                {syncStatus.success && (
+                  <div className="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-emerald-100 text-xs font-semibold">
+                    <div>Baru: {syncStatus.added}</div>
+                    <div>Update: {syncStatus.updated}</div>
+                    <div className="text-rose-700">Gagal: {syncStatus.failed}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={isLoading}>
+            Tutup
+          </Button>
+          <Button onClick={handleSync} disabled={isLoading} className="gap-2">
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            {isLoading ? 'Sedang Sinkron...' : 'Mulai Sinkronisasi'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
