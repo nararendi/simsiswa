@@ -421,15 +421,15 @@ export function useStudents() {
     return '';
   };
 
-  const importExcel = async (file: File): Promise<number> => {
+  const importExcel = async (file: File, sheetName?: string): Promise<number> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
           const data = e.target?.result;
           const workbook = read(data, { type: 'binary' });
-          const firstSheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[firstSheetName];
+          const selectedSheetName = sheetName || workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[selectedSheetName];
           const json = utils.sheet_to_json(worksheet);
 
           // Sinonim pencarian kolom Excel (Fuzzy Matching)

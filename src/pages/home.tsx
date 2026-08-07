@@ -23,7 +23,9 @@ import { KelulusanModal } from '@/components/modals/KelulusanModal';
 import { StudentFormModal } from '@/components/modals/StudentFormModal';
 import { StudentDetailModal } from '@/components/modals/StudentDetailModal';
 import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
+import { read } from 'xlsx';
 import { KelolaAdminModal } from '@/components/modals/KelolaAdminModal';
+import { ImportExcelModal } from '@/components/modals/ImportExcelModal';
 
 
 export default function Home() {
@@ -51,6 +53,11 @@ export default function Home() {
   const [modalDetailOpen, setModalDetailOpen] = useState(false);
   const [modalDeleteOpen, setModalDeleteOpen] = useState(false);
   const [modalAdminOpen, setModalAdminOpen] = useState(false);
+  
+  // Excel Sheet Selection state
+  const [excelFile, setExcelFile] = useState<File | null>(null);
+  const [excelSheetNames, setExcelSheetNames] = useState<string[]>([]);
+  const [modalImportExcelOpen, setModalImportExcelOpen] = useState(false);
 
   
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -87,13 +94,50 @@ export default function Home() {
   const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    try {
-      const count = await importExcel(file);
-      toast({ title: 'Import Berhasil', description: `${count} data siswa telah ditambahkan.` });
-    } catch (err) {
-      toast({ variant: 'destructive', title: 'Import Gagal', description: 'Pastikan format file Excel sesuai template.' });
-    }
+
+    // Reset file input
     if (fileInputExcelRef.current) fileInputExcelRef.current.value = '';
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = event.target?.result;
+        const workbook = read(data, { type: 'binary' });
+        const sheetNames = workbook.SheetNames;
+
+        if (sheetNames.length === 0) {
+          toast({ variant: 'destructive', title: 'File Kosong', description: 'Tidak ada sheet di dalam file Excel.' });
+          return;
+        }
+
+        if (sheetNames.length === 1) {
+          // Hanya 1 sheet -> langsung impor
+          const count = await importExcel(file, sheetNames[0]);
+          toast({ title: 'Import Berhasil', description: `${count} data siswa dari sheet "${sheetNames[0]}" telah ditambahkan.` });
+        } else {
+          // Lebih dari 1 sheet -> simpan file di state dan buka modal pilihan
+          setExcelFile(file);
+          setExcelSheetNames(sheetNames);
+          setModalImportExcelOpen(true);
+        }
+      } catch (err) {
+        toast({ variant: 'destructive', title: 'Import Gagal', description: 'Pastikan file Excel Anda valid.' });
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleSelectSheetImport = async (sheetName: string) => {
+    if (!excelFile) return;
+    try {
+      const count = await importExcel(excelFile, sheetName);
+      toast({ title: 'Import Berhasil', description: `${count} data siswa dari sheet "${sheetName}" telah ditambahkan.` });
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Import Gagal', description: 'Gagal mengimpor sheet yang dipilih.' });
+    } finally {
+      setExcelFile(null);
+      setExcelSheetNames([]);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -499,6 +543,13 @@ export default function Home() {
       <KelolaAdminModal 
         isOpen={modalAdminOpen}
         onClose={() => setModalAdminOpen(false)}
+      />
+
+      <ImportExcelModal
+        isOpen={modalImportExcelOpen}
+        onClose={() => { setModalImportExcelOpen(false); setExcelFile(null); }}
+        sheetNames={excelSheetNames}
+        onImport={handleSelectSheetImport}
       />
 
 
