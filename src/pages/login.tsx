@@ -45,21 +45,21 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4 font-sans">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-blue-50/50 flex flex-col items-center justify-center p-4 font-sans">
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 bg-indigo-600 text-white rounded flex items-center justify-center shadow-lg shadow-indigo-500/20">
-          <Database className="w-6 h-6" />
+        <div className="w-12 h-12 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
+          <Database className="w-7 h-7" />
         </div>
         <div>
-          <h1 className="font-bold text-xl leading-tight tracking-tight text-slate-100">SIM-SISWA</h1>
-          <p className="text-xs text-slate-100">Sistem Informasi Input & Manajemen Siswa</p>
+          <h1 className="font-bold text-2xl leading-tight tracking-tight text-slate-800">SIM-SISWA</h1>
+          <p className="text-xs text-slate-600">Sistem Informasi Input & Manajemen Siswa</p>
         </div>
       </div>
 
-      <Card className="w-full max-w-md shadow-2xl bg-slate-900 border-slate-800 text-slate-100">
+      <Card className="w-full max-w-md shadow-xl border-slate-200/80 bg-white">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold tracking-tight text-slate-100">Masuk ke SIM</CardTitle>
-          <CardDescription className="text-slate-400">
+          <CardTitle className="text-2xl font-bold tracking-tight text-slate-800">Masuk ke SIM</CardTitle>
+          <CardDescription className="text-slate-500">
             Masukkan email dan password admin Anda
           </CardDescription>
         </CardHeader>
