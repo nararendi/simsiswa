@@ -463,12 +463,14 @@ export default function Home() {
                             <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setSelectedStudent(student); setModalDetailOpen(true); }}>
                               <Eye className="w-4 h-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-amber-600 hover:bg-amber-50" onClick={() => { setSelectedStudent(student); setModalFormOpen(true); }}>
+                             <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-amber-600 hover:bg-amber-50" onClick={() => { setSelectedStudent(student); setModalFormOpen(true); }}>
                               <Edit className="w-4 h-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive hover:bg-destructive/10" onClick={() => { setSelectedStudent(student); setModalDeleteOpen(true); }}>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            {student.status !== 'Alumni' && (
+                              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive hover:bg-destructive/10" onClick={() => { setSelectedStudent(student); setModalDeleteOpen(true); }}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -517,9 +519,11 @@ export default function Home() {
                       <Button size="sm" variant="ghost" className="flex-1 text-xs hover:text-amber-600 hover:bg-amber-50" onClick={() => { setSelectedStudent(student); setModalFormOpen(true); }}>
                         <Edit className="w-3.5 h-3.5 mr-1.5" /> Edit
                       </Button>
-                      <Button size="sm" variant="ghost" className="flex-none px-2 text-xs hover:text-destructive hover:bg-destructive/10" onClick={() => { setSelectedStudent(student); setModalDeleteOpen(true); }}>
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
+                      {student.status !== 'Alumni' && (
+                        <Button size="sm" variant="ghost" className="flex-none px-2 text-xs hover:text-destructive hover:bg-destructive/10" onClick={() => { setSelectedStudent(student); setModalDeleteOpen(true); }}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
