@@ -168,39 +168,40 @@ export default function Home() {
               <p className="text-xs text-primary-foreground/70 hidden sm:block">Sistem Informasi Input & Manajemen Data Siswa</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <Button 
-              variant="ghost" 
-              className="hover:bg-primary-foreground/10 text-primary-foreground flex gap-2"
+              variant="outline" 
+              className="bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-200 hover:text-white flex gap-2"
               onClick={() => setModalTahunOpen(true)}
             >
-              <Calendar className="w-4 h-4" /> 
+              <Calendar className="w-4 h-4 text-indigo-400" /> 
               <span className="hidden sm:inline">TA: {tahunAjaran || 'Belum diatur'}</span>
             </Button>
+
             <Button 
-              className="bg-amber-400 hover:bg-amber-500 text-amber-950 font-semibold"
+              className="bg-amber-400 hover:bg-amber-500 text-amber-950 font-semibold shadow-md shadow-amber-500/10"
               onClick={() => {
                 setSelectedStudent(null);
                 setModalFormOpen(true);
               }}
             >
-              <Plus className="w-4 h-4 mr-2" />
+              <Plus className="w-4 h-4 mr-1.5" />
               Tambah Siswa
             </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="hover:bg-primary-foreground/10 text-primary-foreground">
-                  <Settings className="w-5 h-5" />
+                <Button variant="outline" size="icon" className="bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-100 hover:text-white">
+                  <Settings className="w-5 h-5 text-slate-100" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => setModalAdminOpen(true)}>
-                  <Settings className="w-4 h-4 mr-2" />
+              <DropdownMenuContent align="end" className="w-48 bg-slate-900 border-slate-800 text-slate-100">
+                <DropdownMenuItem onClick={() => setModalAdminOpen(true)} className="hover:bg-slate-800 focus:bg-slate-800 focus:text-slate-100 cursor-pointer">
+                  <Settings className="w-4 h-4 mr-2 text-indigo-400" />
                   Kelola Akun
                 </DropdownMenuItem>
                 <DropdownMenuItem 
-                  className="text-rose-600 focus:text-rose-600 focus:bg-rose-50"
+                  className="text-rose-400 focus:text-rose-400 focus:bg-rose-950/50 hover:bg-rose-950/50 cursor-pointer"
                   onClick={() => {
                     localStorage.removeItem('sim_auth_token');
                     toast({ title: 'Logout Berhasil', description: 'Anda telah keluar dari sistem.' });
