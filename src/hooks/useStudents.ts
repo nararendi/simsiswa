@@ -545,7 +545,8 @@ export function useStudents() {
       reader.onload = async (e) => {
         try {
           const data = e.target?.result;
-          const workbook = read(data, { type: 'binary' });
+          // Gunakan ArrayBuffer (lebih andal dari binary string di semua browser)
+          const workbook = read(data, { type: 'array' });
           const selectedSheetName = sheetName || workbook.SheetNames[0];
           const worksheet = workbook.Sheets[selectedSheetName];
           const json = utils.sheet_to_json(worksheet);
@@ -706,16 +707,19 @@ export function useStudents() {
               return incoming;
             });
 
-            // Upsert ke Supabase (hanya data baru/update dari Excel, menggunakan conflict pada kolom id)
+            // Upsert ke Supabase dalam batch 100 baris agar tidak melebihi batas payload
             const dbRows = studentsToUpsert.map(mapStudentToDb);
-            const { error } = await supabase
-              .from('siswa')
-              .upsert(dbRows, { onConflict: 'id' });
-            
-            if (error) {
-              console.error('Upsert Excel import error:', error);
-              reject(error);
-              return;
+            const BATCH_SIZE = 100;
+            for (let i = 0; i < dbRows.length; i += BATCH_SIZE) {
+              const batch = dbRows.slice(i, i + BATCH_SIZE);
+              const { error } = await supabase
+                .from('siswa')
+                .upsert(batch, { onConflict: 'id' });
+              if (error) {
+                console.error(`Upsert Excel import error (batch ${Math.floor(i / BATCH_SIZE) + 1}):`, JSON.stringify(error));
+                reject(new Error(error.message || JSON.stringify(error)));
+                return;
+              }
             }
 
             // Gabungkan data baru ke state lokal (timpa yang ada, tambahkan yang baru ke akhir)
@@ -745,7 +749,8 @@ export function useStudents() {
         }
       };
       reader.onerror = (error) => reject(error);
-      reader.readAsBinaryString(file);
+      // readAsArrayBuffer lebih andal dan tidak deprecated
+      reader.readAsArrayBuffer(file);
     });
   };
 

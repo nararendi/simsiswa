@@ -120,8 +120,16 @@ export default function Home() {
     try {
       const count = await importExcel(file);
       toast({ title: 'Import Berhasil', description: `${count} data siswa berhasil diimpor.` });
-    } catch (err) {
-      toast({ variant: 'destructive', title: 'Import Gagal', description: 'Pastikan file Excel Anda valid dan coba lagi.' });
+    } catch (err: any) {
+      const detail = err?.message || String(err) || '';
+      console.error('Import Excel gagal:', err);
+      toast({
+        variant: 'destructive',
+        title: 'Import Gagal',
+        description: detail
+          ? `Terjadi kesalahan: ${detail}`
+          : 'Pastikan file Excel Anda valid dan coba lagi.',
+      });
     }
   };
 
