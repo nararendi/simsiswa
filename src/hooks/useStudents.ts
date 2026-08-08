@@ -686,76 +686,17 @@ export function useStudents() {
           });
 
           if (importedCount > 0) {
-            // --- Cross-check ke Supabase: cari siswa existing berdasarkan NISN & NIK ---
-            // Ini penting agar siswa yang sudah ada di DB (tapi belum ter-load di state)
-            // tidak dianggap "baru" sehingga melanggar unique constraint (nik, nisn, dll.)
-            const incomingNisns = newStudents.map(s => s.nisn).filter(Boolean);
-            const incomingNiks  = newStudents.map(s => s.nik).filter(Boolean);
+            // Normalisasi NISN & NIK: trim whitespace
+            const normalized = newStudents.map(s => ({
+              ...s,
+              nisn: s.nisn?.trim() || '',
+              nik:  s.nik?.trim()  || '',
+            }));
 
-            let dbExistingMap: Record<string, string> = {}; // key: nisn|nik -> id
-
-            if (incomingNisns.length > 0) {
-              const { data: byNisn } = await supabase
-                .from('siswa')
-                .select('id, nisn, nik')
-                .in('nisn', incomingNisns);
-              (byNisn || []).forEach((r: any) => {
-                if (r.nisn) dbExistingMap[`nisn:${r.nisn}`] = r.id;
-                if (r.nik)  dbExistingMap[`nik:${r.nik}`]  = r.id;
-              });
-            }
-
-            if (incomingNiks.length > 0) {
-              const { data: byNik } = await supabase
-                .from('siswa')
-                .select('id, nisn, nik')
-                .in('nik', incomingNiks);
-              (byNik || []).forEach((r: any) => {
-                if (r.nisn) dbExistingMap[`nisn:${r.nisn}`] = r.id;
-                if (r.nik)  dbExistingMap[`nik:${r.nik}`]  = r.id;
-              });
-            }
-
-            // Ganti ID incoming agar sesuai dengan ID yang sudah ada di database jika ada
-            const rawMapped = newStudents.map(incoming => {
-              // 1. Cari di state lokal berdasarkan NISN (prioritas utama)
-              let existing = incoming.nisn
-                ? students.find(s => s.nisn && s.nisn === incoming.nisn)
-                : null;
-              
-              // 2. Cari di state lokal berdasarkan NIK
-              if (!existing && incoming.nik) {
-                existing = students.find(s => s.nik && s.nik === incoming.nik);
-              }
-
-              // 3. Cari di state lokal berdasarkan nama
-              if (!existing) {
-                existing = students.find(
-                  s => s.nama.trim().toLowerCase() === incoming.nama.trim().toLowerCase()
-                );
-              }
-
-              if (existing) {
-                return { ...incoming, id: existing.id };
-              }
-
-              // 4. Cari di Supabase (cross-check) berdasarkan NISN atau NIK
-              const dbId = (incoming.nisn && dbExistingMap[`nisn:${incoming.nisn}`])
-                || (incoming.nik && dbExistingMap[`nik:${incoming.nik}`]);
-              if (dbId) {
-                return { ...incoming, id: dbId };
-              }
-
-              return incoming;
-            });
-
-            // --- Deduplikasi: jika ada duplikat NISN/NIK/ID dalam Excel, ambil yang pertama ---
-            const seenIds   = new Set<string>();
+            // --- Deduplikasi dalam Excel: ambil baris pertama jika ada duplikat NISN/NIK ---
             const seenNisns = new Set<string>();
             const seenNiks  = new Set<string>();
-            const studentsToUpsert = rawMapped.filter(s => {
-              if (seenIds.has(s.id)) return false;
-              seenIds.add(s.id);
+            const deduped = normalized.filter(s => {
               if (s.nisn && seenNisns.has(s.nisn)) return false;
               if (s.nisn) seenNisns.add(s.nisn);
               if (s.nik  && seenNiks.has(s.nik))  return false;
@@ -763,74 +704,88 @@ export function useStudents() {
               return true;
             });
 
-            // --- Pisahkan: existing (UPDATE) vs baru (INSERT) ---
-            const existingIds = new Set([
-              ...Object.values(dbExistingMap),
-              ...students.map(s => s.id),
-            ]);
-            const toUpdate = studentsToUpsert.filter(s => existingIds.has(s.id));
-            const toInsert = studentsToUpsert.filter(s => !existingIds.has(s.id));
+            // --- Pisah 3 kelompok berdasarkan kolom unique yang dimiliki ---
+            // Kelompok 1: punya NISN → upsert onConflict:'nisn' (DB resolve sendiri)
+            const withNisn  = deduped.filter(s => !!s.nisn);
+            // Kelompok 2: tidak punya NISN, punya NIK → upsert onConflict:'nik'
+            const withNikOnly = deduped.filter(s => !s.nisn && !!s.nik);
+            // Kelompok 3: tidak punya NISN maupun NIK → insert biasa (null-safe)
+            const withNeither = deduped.filter(s => !s.nisn && !s.nik);
 
             const BATCH_SIZE = 100;
 
-            // UPDATE yang sudah ada (aman karena pakai ID yang sudah ada di DB)
-            if (toUpdate.length > 0) {
-              const updateRows = toUpdate.map(mapStudentToDb);
-              for (let i = 0; i < updateRows.length; i += BATCH_SIZE) {
-                const batch = updateRows.slice(i, i + BATCH_SIZE);
-                const { error } = await supabase
-                  .from('siswa')
-                  .upsert(batch, { onConflict: 'id' });
-                if (error) {
-                  console.error(`Update batch error:`, JSON.stringify(error));
-                  reject(new Error(error.message || JSON.stringify(error)));
-                  return;
-                }
-              }
-            }
-
-            // INSERT yang benar-benar baru (hapus nisn/nik kosong agar tidak tabrakan null-unique)
-            if (toInsert.length > 0) {
-              const insertRows = toInsert.map(s => {
+            // Kelompok 1: upsert berdasarkan NISN — Supabase resolve sendiri conflict NISN
+            if (withNisn.length > 0) {
+              const rows = withNisn.map(s => {
                 const row = mapStudentToDb(s);
-                // Pastikan nisn/nik null (bukan '') agar tidak kena unique constraint
-                if (!row.nisn) row.nisn = null;
-                if (!row.nik)  row.nik  = null;
+                row.nisn = s.nisn;
+                row.nik  = s.nik  || null;
                 return row;
               });
-              for (let i = 0; i < insertRows.length; i += BATCH_SIZE) {
-                const batch = insertRows.slice(i, i + BATCH_SIZE);
+              for (let i = 0; i < rows.length; i += BATCH_SIZE) {
                 const { error } = await supabase
                   .from('siswa')
-                  .insert(batch);
+                  .upsert(rows.slice(i, i + BATCH_SIZE), { onConflict: 'nisn' });
                 if (error) {
-                  console.error(`Insert batch error:`, JSON.stringify(error));
+                  console.error('Upsert (nisn) error:', JSON.stringify(error));
                   reject(new Error(error.message || JSON.stringify(error)));
                   return;
                 }
               }
             }
 
-            // Gabungkan data baru ke state lokal (timpa yang ada, tambahkan yang baru ke akhir)
-            const updatedStudents = [...students];
-            for (const incoming of studentsToUpsert) {
-              const existingIndex = updatedStudents.findIndex(
-                s => s.id === incoming.id
-              );
-              if (existingIndex >= 0) {
-                updatedStudents[existingIndex] = incoming;
-              } else {
-                updatedStudents.push(incoming);
+            // Kelompok 2: upsert berdasarkan NIK — Supabase resolve sendiri conflict NIK
+            if (withNikOnly.length > 0) {
+              const rows = withNikOnly.map(s => {
+                const row = mapStudentToDb(s);
+                row.nisn = null;
+                row.nik  = s.nik;
+                return row;
+              });
+              for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+                const { error } = await supabase
+                  .from('siswa')
+                  .upsert(rows.slice(i, i + BATCH_SIZE), { onConflict: 'nik' });
+                if (error) {
+                  console.error('Upsert (nik) error:', JSON.stringify(error));
+                  reject(new Error(error.message || JSON.stringify(error)));
+                  return;
+                }
               }
             }
 
-            // Urutkan seluruh siswa secara alfabetis A-Z berdasarkan nama
-            updatedStudents.sort((a, b) => a.nama.localeCompare(b.nama));
+            // Kelompok 3: insert siswa tanpa NISN dan NIK — pastikan null bukan ''
+            if (withNeither.length > 0) {
+              const rows = withNeither.map(s => {
+                const row = mapStudentToDb(s);
+                row.nisn = null;
+                row.nik  = null;
+                return row;
+              });
+              for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+                const { error } = await supabase
+                  .from('siswa')
+                  .insert(rows.slice(i, i + BATCH_SIZE));
+                if (error) {
+                  console.error('Insert (no-nisn-nik) error:', JSON.stringify(error));
+                  reject(new Error(error.message || JSON.stringify(error)));
+                  return;
+                }
+              }
+            }
 
-            // Simpan ke state dan localStorage (HANYA setelah database sukses)
-            setStudents(updatedStudents);
-            localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updatedStudents));
-            syncClasses(updatedStudents);
+            // Fetch ulang dari DB setelah semua operasi selesai agar state akurat
+            const { data: refreshed } = await supabase
+              .from('siswa')
+              .select('*')
+              .order('nama_lengkap', { ascending: true });
+
+            if (refreshed) {
+              const mappedRefreshed = refreshed.map(mapDbToStudent);
+              setStudents(mappedRefreshed);
+              localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(mappedRefreshed));
+              syncClasses(mappedRefreshed);
+            }
           }
           resolve(importedCount);
         } catch (error) {
