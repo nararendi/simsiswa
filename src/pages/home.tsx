@@ -642,6 +642,7 @@ export default function Home() {
       <KelolaKelasModal 
         isOpen={modalKelolaKelasOpen} onClose={() => setModalKelolaKelasOpen(false)}
         classes={classes} students={students} updateClasses={updateClasses} syncClasses={syncClasses}
+        deleteStudent={deleteStudent}
       />
       <PindahKelasModal 
         isOpen={modalPindahKelasOpen} onClose={() => setModalPindahKelasOpen(false)}
