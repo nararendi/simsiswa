@@ -99,6 +99,11 @@ const sanitizeDate = (val: any): string | null => {
   return null;
 };
 
+export const readExcelWorkbook = async (file: File) => {
+  const arrayBuffer = await file.arrayBuffer();
+  return read(arrayBuffer, { type: 'array' });
+};
+
 // Helper: Map Database Row to Student Interface
 export function mapDbToStudent(row: any): Student {
   return {
@@ -540,273 +545,269 @@ export function useStudents() {
   };
 
   const importExcel = async (file: File, sheetName?: string): Promise<number> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const data = e.target?.result;
-          // Gunakan ArrayBuffer (lebih andal dari binary string di semua browser)
-          const workbook = read(data, { type: 'array' });
-          const selectedSheetName = sheetName || workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[selectedSheetName];
-          const json = utils.sheet_to_json(worksheet);
+    try {
+      const workbook = await readExcelWorkbook(file);
+      if (!workbook?.SheetNames?.length) {
+        throw new Error('File Excel tidak memiliki sheet yang dapat dibaca.');
+      }
 
-          // Sinonim pencarian kolom Excel (Fuzzy Matching)
-          const synonymsMap: Record<string, string[]> = {
-            nama: ['nama', 'nama lengkap', 'nama_lengkap', 'fullname', 'full name', 'siswa', 'nama siswa'],
-            nisn: ['nisn', 'nomor induk siswa nasional', 'no. nisn'],
-            nis: ['nis', 'nipd', 'nomor induk', 'nomor induk siswa', 'no. nis'],
-            nik: ['nik', 'no. nik', 'nomor induk kependudukan', 'no ktp', 'ktp'],
-            kelas: ['kelas', 'rombel', 'nama kelas', 'tingkat'],
-            asalSekolah: ['asal sekolah', 'sekolah asal', 'asal_sekolah', 'smp asal', 'sekolah smp'],
-            jenisKelamin: ['jenis kelamin', 'jk', 'sex', 'gender', 'jenis_kelamin', 'l/p', 'jenis_kelamin'],
-            agama: ['agama', 'religion'],
-            kotaLahir: ['tempat lahir', 'kota lahir', 'tempat_lahir', 'kota_lahir'],
-            tanggalLahir: ['tanggal lahir', 'tgl lahir', 'tanggal_lahir', 'tgl_lahir', 'birthdate'],
-            hpSiswa: ['hp', 'no hp', 'hp siswa', 'no telp', 'telepon', 'hp_siswa', 'nomor telepon seluler', 'no. hp'],
-            alamat: ['alamat', 'alamat jalan', 'jalan', 'alamat_jalan'],
-            rt: ['rt', 'rt/rw', 'nomor rt'],
-            rw: ['rw', 'nomor rw'],
-            kelurahan: ['kelurahan', 'desa', 'desa/kelurahan', 'kelurahan/desa', 'desa_kelurahan'],
-            kecamatan: ['kecamatan', 'distrik'],
-            kodePos: ['kode pos', 'kodepos', 'kode_pos', 'zip', 'zipcode'],
-            noKk: ['no kk', 'nomor kk', 'kartu keluarga', 'no_kk'],
-            namaAyah: ['nama ayah', 'ayah', 'nama_ayah'],
-            nikAyah: ['nik ayah', 'nik_ayah'],
-            thnLahirAyah: ['tahun lahir ayah', 'thn lahir ayah', 'tahun_lahir_ayah', 'lahir_ayah'],
-            pendidikanAyah: ['pendidikan ayah', 'pendidikan_ayah', 'lulusan ayah'],
-            pekerjaanAyah: ['pekerjaan ayah', 'pekerjaan_ayah', 'kerja ayah'],
-            penghasilanAyah: ['penghasilan ayah', 'penghasilan_ayah', 'gaji ayah'],
-            hpAyah: ['hp ayah', 'no hp ayah', 'telepon ayah'],
-            namaIbu: ['nama ibu', 'ibu', 'nama_ibu', 'nama ibu kandung', 'nama_ibu_kandung'],
-            nikIbu: ['nik ibu', 'nik_ibu'],
-            thnLahirIbu: ['tahun lahir ibu', 'thn lahir ibu', 'tahun_lahir_ibu', 'lahir_ibu'],
-            pendidikanIbu: ['pendidikan ibu', 'pendidikan_ibu', 'lulusan ibu'],
-            pekerjaanIbu: ['pekerjaan ibu', 'pekerjaan_ibu', 'kerja ibu'],
-            penghasilanIbu: ['penghasilan ibu', 'penghasilan_ibu', 'gaji ibu'],
-            hpIbu: ['hp ibu', 'no hp ibu', 'telepon ibu'],
-            tinggiBadan: ['tinggi badan', 'tinggi', 'tinggi_badan', 'tb'],
-            beratBadan: ['berat badan', 'berat', 'berat_badan', 'bb'],
-            anakKe: ['anak ke', 'anak_ke', 'anak keberapa'],
-            jumlahSaudara: ['jumlah saudara', 'saudara', 'jumlah_saudara'],
-            golDarah: ['gol darah', 'golongan darah', 'gol_darah', 'blood type', 'darah']
-          };
+      const selectedSheetName = sheetName || workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[selectedSheetName];
+      if (!worksheet) {
+        throw new Error(`Sheet "${selectedSheetName}" tidak ditemukan dalam file Excel.`);
+      }
 
-          // Helper pencari nilai kolom dari Excel
-          const getExcelValue = (row: any, fieldKey: string): string => {
-            const synonyms = synonymsMap[fieldKey];
-            if (!synonyms) return '';
+      const json = utils.sheet_to_json(worksheet);
 
-            const rowKeys = Object.keys(row);
-            for (const rowKey of rowKeys) {
-              const cleanRowKey = rowKey.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-              for (const synonym of synonyms) {
-                const cleanSynonym = synonym.replace(/[^a-z0-9]/g, '');
-                if (cleanRowKey === cleanSynonym) {
-                  return String(row[rowKey] || '').trim();
-                }
-              }
-            }
-            return '';
-          };
+      // Sinonim pencarian kolom Excel (Fuzzy Matching)
+      const synonymsMap: Record<string, string[]> = {
+        nama: ['nama', 'nama lengkap', 'nama_lengkap', 'fullname', 'full name', 'siswa', 'nama siswa'],
+        nisn: ['nisn', 'nomor induk siswa nasional', 'no. nisn'],
+        nis: ['nis', 'nipd', 'nomor induk', 'nomor induk siswa', 'no. nis'],
+        nik: ['nik', 'no. nik', 'nomor induk kependudukan', 'no ktp', 'ktp'],
+        kelas: ['kelas', 'rombel', 'nama kelas', 'tingkat'],
+        asalSekolah: ['asal sekolah', 'sekolah asal', 'asal_sekolah', 'smp asal', 'sekolah smp'],
+        jenisKelamin: ['jenis kelamin', 'jk', 'sex', 'gender', 'jenis_kelamin', 'l/p', 'jenis_kelamin'],
+        agama: ['agama', 'religion'],
+        kotaLahir: ['tempat lahir', 'kota lahir', 'tempat_lahir', 'kota_lahir'],
+        tanggalLahir: ['tanggal lahir', 'tgl lahir', 'tanggal_lahir', 'tgl_lahir', 'birthdate'],
+        hpSiswa: ['hp', 'no hp', 'hp siswa', 'no telp', 'telepon', 'hp_siswa', 'nomor telepon seluler', 'no. hp'],
+        alamat: ['alamat', 'alamat jalan', 'jalan', 'alamat_jalan'],
+        rt: ['rt', 'rt/rw', 'nomor rt'],
+        rw: ['rw', 'nomor rw'],
+        kelurahan: ['kelurahan', 'desa', 'desa/kelurahan', 'kelurahan/desa', 'desa_kelurahan'],
+        kecamatan: ['kecamatan', 'distrik'],
+        kodePos: ['kode pos', 'kodepos', 'kode_pos', 'zip', 'zipcode'],
+        noKk: ['no kk', 'nomor kk', 'kartu keluarga', 'no_kk'],
+        namaAyah: ['nama ayah', 'ayah', 'nama_ayah'],
+        nikAyah: ['nik ayah', 'nik_ayah'],
+        thnLahirAyah: ['tahun lahir ayah', 'thn lahir ayah', 'tahun_lahir_ayah', 'lahir_ayah'],
+        pendidikanAyah: ['pendidikan ayah', 'pendidikan_ayah', 'lulusan ayah'],
+        pekerjaanAyah: ['pekerjaan ayah', 'pekerjaan_ayah', 'kerja ayah'],
+        penghasilanAyah: ['penghasilan ayah', 'penghasilan_ayah', 'gaji ayah'],
+        hpAyah: ['hp ayah', 'no hp ayah', 'telepon ayah'],
+        namaIbu: ['nama ibu', 'ibu', 'nama_ibu', 'nama ibu kandung', 'nama_ibu_kandung'],
+        nikIbu: ['nik ibu', 'nik_ibu'],
+        thnLahirIbu: ['tahun lahir ibu', 'thn lahir ibu', 'tahun_lahir_ibu', 'lahir_ibu'],
+        pendidikanIbu: ['pendidikan ibu', 'pendidikan_ibu', 'lulusan ibu'],
+        pekerjaanIbu: ['pekerjaan ibu', 'pekerjaan_ibu', 'kerja ibu'],
+        penghasilanIbu: ['penghasilan ibu', 'penghasilan_ibu', 'gaji ibu'],
+        hpIbu: ['hp ibu', 'no hp ibu', 'telepon ibu'],
+        tinggiBadan: ['tinggi badan', 'tinggi', 'tinggi_badan', 'tb'],
+        beratBadan: ['berat badan', 'berat', 'berat_badan', 'bb'],
+        anakKe: ['anak ke', 'anak_ke', 'anak keberapa'],
+        jumlahSaudara: ['jumlah saudara', 'saudara', 'jumlah_saudara'],
+        golDarah: ['gol darah', 'golongan darah', 'gol_darah', 'blood type', 'darah']
+      };
 
-          // Helper format data: Hanya nama siswa yang diubah ke UPPERCASE, yang lain dibiarkan apa adanya
-          const formatValue = (val: string, fieldKey: string): string => {
-            if (!val) return '';
-            
-            if (fieldKey === 'nama') {
-              return val.toUpperCase();
-            }
+      // Helper pencari nilai kolom dari Excel
+      const getExcelValue = (row: any, fieldKey: string): string => {
+        const synonyms = synonymsMap[fieldKey];
+        if (!synonyms) return '';
 
-            return val;
-          };
-
-          let importedCount = 0;
-          const newStudents: Student[] = [];
-
-          json.forEach((row: any) => {
-            const rawNama = getExcelValue(row, 'nama');
-            const rawNisn = getExcelValue(row, 'nisn');
-
-            if (rawNama) {
-              // Parse Jenis Kelamin cerdas
-              let jk = getExcelValue(row, 'jenisKelamin');
-              let cleanJk: 'Laki-laki' | 'Perempuan' = 'Laki-laki';
-              if (jk) {
-                const jkLower = jk.toLowerCase();
-                if (jkLower === 'p' || jkLower.includes('perempuan') || jkLower.includes('wanita') || jkLower === 'female') {
-                  cleanJk = 'Perempuan';
-                }
-              }
-
-              const newStudent: Student = {
-                id: crypto.randomUUID(),
-                nama:             formatValue(rawNama, 'nama'),
-                nisn:             formatValue(rawNisn, 'nisn'),
-                nis:              formatValue(getExcelValue(row, 'nis'), 'nis'),
-                nik:              formatValue(getExcelValue(row, 'nik'), 'nik'),
-                kelas:            formatValue(getExcelValue(row, 'kelas'), 'kelas'),
-                asalSekolah:      formatValue(getExcelValue(row, 'asalSekolah'), 'asalSekolah'),
-                jenisKelamin:     cleanJk,
-                agama:            formatValue(getExcelValue(row, 'agama') || 'Islam', 'agama'),
-                kotaLahir:        formatValue(getExcelValue(row, 'kotaLahir'), 'kotaLahir'),
-                tanggalLahir:     getExcelValue(row, 'tanggalLahir'),
-                hpSiswa:          getExcelValue(row, 'hpSiswa'),
-                status:           'Aktif',
-                alamat:           formatValue(getExcelValue(row, 'alamat'), 'alamat'),
-                rt:               formatValue(getExcelValue(row, 'rt'), 'rt'),
-                rw:               formatValue(getExcelValue(row, 'rw'), 'rw'),
-                kelurahan:        formatValue(getExcelValue(row, 'kelurahan'), 'kelurahan'),
-                kecamatan:        formatValue(getExcelValue(row, 'kecamatan'), 'kecamatan'),
-                kodePos:          formatValue(getExcelValue(row, 'kodePos'), 'kodePos'),
-                noKk:             formatValue(getExcelValue(row, 'noKk'), 'noKk'),
-                namaAyah:         formatValue(getExcelValue(row, 'namaAyah'), 'namaAyah'),
-                nikAyah:          formatValue(getExcelValue(row, 'nikAyah'), 'nikAyah'),
-                thnLahirAyah:     getExcelValue(row, 'thnLahirAyah'),
-                pendidikanAyah:   formatValue(getExcelValue(row, 'pendidikanAyah'), 'pendidikanAyah'),
-                pekerjaanAyah:    formatValue(getExcelValue(row, 'pekerjaanAyah'), 'pekerjaanAyah'),
-                penghasilanAyah:  formatValue(getExcelValue(row, 'penghasilanAyah'), 'penghasilanAyah'),
-                hpAyah:           getExcelValue(row, 'hpAyah'),
-                namaIbu:          formatValue(getExcelValue(row, 'namaIbu'), 'namaIbu'),
-                nikIbu:           formatValue(getExcelValue(row, 'nikIbu'), 'nikIbu'),
-                thnLahirIbu:      getExcelValue(row, 'thnLahirIbu'),
-                pendidikanIbu:    formatValue(getExcelValue(row, 'pendidikanIbu'), 'pendidikanIbu'),
-                pekerjaanIbu:     formatValue(getExcelValue(row, 'pekerjaanIbu'), 'pekerjaanIbu'),
-                penghasilanIbu:   formatValue(getExcelValue(row, 'penghasilanIbu'), 'penghasilanIbu'),
-                hpIbu:            getExcelValue(row, 'hpIbu'),
-                tinggiBadan:      getExcelValue(row, 'tinggiBadan'),
-                beratBadan:       getExcelValue(row, 'beratBadan'),
-                anakKe:           getExcelValue(row, 'anakKe'),
-                jumlahSaudara:    getExcelValue(row, 'jumlahSaudara'),
-                golDarah:         formatValue(getExcelValue(row, 'golDarah'), 'golDarah')
-              };
-              newStudents.push(newStudent);
-              importedCount++;
-            }
-          });
-
-          if (importedCount > 0) {
-            const BATCH_SIZE = 100;
-
-            // === STEP 1: Fetch semua data existing dari DB untuk ID lookup ===
-            const { data: allExisting } = await supabase
-              .from('siswa')
-              .select('id, nisn, nik, nama_lengkap');
-
-            // Bangun lookup map: nisn/nik/nama → id (semua dinormalisasi lowercase+trim)
-            const nisnToId: Record<string, string> = {};
-            const nikToId:  Record<string, string> = {};
-            const namaToId: Record<string, string> = {};
-            (allExisting || []).forEach((r: any) => {
-              if (r.nisn) nisnToId[r.nisn.trim()]                              = r.id;
-              if (r.nik)  nikToId[r.nik.trim()]                                = r.id;
-              if (r.nama_lengkap) namaToId[r.nama_lengkap.trim().toLowerCase()] = r.id;
-            });
-
-            // === STEP 2: Normalisasi & deduplikasi data Excel ===
-            const seenNisns = new Set<string>();
-            const seenNiks  = new Set<string>();
-            const seenIds   = new Set<string>();
-            const deduped: Student[] = [];
-
-            for (const s of newStudents) {
-              const nisn = s.nisn?.trim() || '';
-              const nik  = s.nik?.trim()  || '';
-
-              // Cari ID existing: NISN → NIK → Nama
-              const existingId = (nisn && nisnToId[nisn])
-                || (nik  && nikToId[nik])
-                || namaToId[s.nama.trim().toLowerCase()];
-
-              const finalId = existingId || s.id;
-
-              // Skip jika ID ini sudah ada dalam batch ini (duplikat dalam Excel)
-              if (seenIds.has(finalId)) continue;
-              if (nisn && seenNisns.has(nisn)) continue;
-              if (nik  && seenNiks.has(nik))  continue;
-
-              seenIds.add(finalId);
-              if (nisn) seenNisns.add(nisn);
-              if (nik)  seenNiks.add(nik);
-
-              deduped.push({ ...s, id: finalId, nisn, nik });
-            }
-
-            // === STEP 3: Pisah menjadi toUpdate (ID sudah ada di DB) dan toInsert (baru) ===
-            const existingIdSet = new Set(Object.values(nisnToId)
-              .concat(Object.values(nikToId))
-              .concat(Object.values(namaToId)));
-
-            const toUpdate = deduped.filter(s => existingIdSet.has(s.id));
-            const toInsert = deduped.filter(s => !existingIdSet.has(s.id));
-
-            // === STEP 4: UPDATE siswa existing (by id — tidak ada conflict sama sekali) ===
-            if (toUpdate.length > 0) {
-              const updateRows = toUpdate.map(s => {
-                const row = mapStudentToDb(s);
-                // Pastikan nisn/nik null jika kosong
-                if (!row.nisn) row.nisn = null;
-                if (!row.nik)  row.nik  = null;
-                return row;
-              });
-              for (let i = 0; i < updateRows.length; i += BATCH_SIZE) {
-                const { error } = await supabase
-                  .from('siswa')
-                  .upsert(updateRows.slice(i, i + BATCH_SIZE), { onConflict: 'id' });
-                if (error) {
-                  console.error('Update existing error:', JSON.stringify(error));
-                  reject(new Error(error.message || JSON.stringify(error)));
-                  return;
-                }
-              }
-            }
-
-            // === STEP 5: INSERT siswa baru (satu per satu agar error bisa di-skip) ===
-            // Gunakan insert satu-per-satu agar siswa duplikat yang lolos tidak batalkan semua
-            let skipped = 0;
-            for (const s of toInsert) {
-              const row = mapStudentToDb(s);
-              row.nisn = s.nisn || null;
-              row.nik  = s.nik  || null;
-              const { error } = await supabase.from('siswa').insert([row]);
-              if (error) {
-                // Jika error karena duplikat (bukan error kritis), skip baris ini
-                if (error.code === '23505') {
-                  console.warn('Skip duplikat saat insert:', s.nama, error.message);
-                  skipped++;
-                } else {
-                  console.error('Insert error:', JSON.stringify(error));
-                  reject(new Error(error.message || JSON.stringify(error)));
-                  return;
-                }
-              }
-            }
-            if (skipped > 0) {
-              importedCount -= skipped;
-            }
-
-            // === STEP 6: Fetch ulang dari DB agar state lokal akurat ===
-            const { data: refreshed } = await supabase
-              .from('siswa')
-              .select('*')
-              .order('nama_lengkap', { ascending: true });
-
-            if (refreshed) {
-              const mappedRefreshed = refreshed.map(mapDbToStudent);
-              setStudents(mappedRefreshed);
-              localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(mappedRefreshed));
-              syncClasses(mappedRefreshed);
+        const rowKeys = Object.keys(row);
+        for (const rowKey of rowKeys) {
+          const cleanRowKey = rowKey.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+          for (const synonym of synonyms) {
+            const cleanSynonym = synonym.replace(/[^a-z0-9]/g, '');
+            if (cleanRowKey === cleanSynonym) {
+              return String(row[rowKey] || '').trim();
             }
           }
-          resolve(importedCount);
-        } catch (error) {
-          reject(error);
         }
+        return '';
       };
-      reader.onerror = (error) => reject(error);
-      // readAsArrayBuffer lebih andal dan tidak deprecated
-      reader.readAsArrayBuffer(file);
-    });
+
+      // Helper format data: Hanya nama siswa yang diubah ke UPPERCASE, yang lain dibiarkan apa adanya
+      const formatValue = (val: string, fieldKey: string): string => {
+        if (!val) return '';
+        
+        if (fieldKey === 'nama') {
+          return val.toUpperCase();
+        }
+
+        return val;
+      };
+
+      let importedCount = 0;
+      const newStudents: Student[] = [];
+
+      json.forEach((row: any) => {
+        const rawNama = getExcelValue(row, 'nama');
+        const rawNisn = getExcelValue(row, 'nisn');
+
+        if (rawNama) {
+          // Parse Jenis Kelamin cerdas
+          let jk = getExcelValue(row, 'jenisKelamin');
+          let cleanJk: 'Laki-laki' | 'Perempuan' = 'Laki-laki';
+          if (jk) {
+            const jkLower = jk.toLowerCase();
+            if (jkLower === 'p' || jkLower.includes('perempuan') || jkLower.includes('wanita') || jkLower === 'female') {
+              cleanJk = 'Perempuan';
+            }
+          }
+
+          const newStudent: Student = {
+            id: crypto.randomUUID(),
+            nama:             formatValue(rawNama, 'nama'),
+            nisn:             formatValue(rawNisn, 'nisn'),
+            nis:              formatValue(getExcelValue(row, 'nis'), 'nis'),
+            nik:              formatValue(getExcelValue(row, 'nik'), 'nik'),
+            kelas:            formatValue(getExcelValue(row, 'kelas'), 'kelas'),
+            asalSekolah:      formatValue(getExcelValue(row, 'asalSekolah'), 'asalSekolah'),
+            jenisKelamin:     cleanJk,
+            agama:            formatValue(getExcelValue(row, 'agama') || 'Islam', 'agama'),
+            kotaLahir:        formatValue(getExcelValue(row, 'kotaLahir'), 'kotaLahir'),
+            tanggalLahir:     getExcelValue(row, 'tanggalLahir'),
+            hpSiswa:          getExcelValue(row, 'hpSiswa'),
+            status:           'Aktif',
+            alamat:           formatValue(getExcelValue(row, 'alamat'), 'alamat'),
+            rt:               formatValue(getExcelValue(row, 'rt'), 'rt'),
+            rw:               formatValue(getExcelValue(row, 'rw'), 'rw'),
+            kelurahan:        formatValue(getExcelValue(row, 'kelurahan'), 'kelurahan'),
+            kecamatan:        formatValue(getExcelValue(row, 'kecamatan'), 'kecamatan'),
+            kodePos:          formatValue(getExcelValue(row, 'kodePos'), 'kodePos'),
+            noKk:             formatValue(getExcelValue(row, 'noKk'), 'noKk'),
+            namaAyah:         formatValue(getExcelValue(row, 'namaAyah'), 'namaAyah'),
+            nikAyah:          formatValue(getExcelValue(row, 'nikAyah'), 'nikAyah'),
+            thnLahirAyah:     getExcelValue(row, 'thnLahirAyah'),
+            pendidikanAyah:   formatValue(getExcelValue(row, 'pendidikanAyah'), 'pendidikanAyah'),
+            pekerjaanAyah:    formatValue(getExcelValue(row, 'pekerjaanAyah'), 'pekerjaanAyah'),
+            penghasilanAyah:  formatValue(getExcelValue(row, 'penghasilanAyah'), 'penghasilanAyah'),
+            hpAyah:           getExcelValue(row, 'hpAyah'),
+            namaIbu:          formatValue(getExcelValue(row, 'namaIbu'), 'namaIbu'),
+            nikIbu:           formatValue(getExcelValue(row, 'nikIbu'), 'nikIbu'),
+            thnLahirIbu:      getExcelValue(row, 'thnLahirIbu'),
+            pendidikanIbu:    formatValue(getExcelValue(row, 'pendidikanIbu'), 'pendidikanIbu'),
+            pekerjaanIbu:     formatValue(getExcelValue(row, 'pekerjaanIbu'), 'pekerjaanIbu'),
+            penghasilanIbu:   formatValue(getExcelValue(row, 'penghasilanIbu'), 'penghasilanIbu'),
+            hpIbu:            getExcelValue(row, 'hpIbu'),
+            tinggiBadan:      getExcelValue(row, 'tinggiBadan'),
+            beratBadan:       getExcelValue(row, 'beratBadan'),
+            anakKe:           getExcelValue(row, 'anakKe'),
+            jumlahSaudara:    getExcelValue(row, 'jumlahSaudara'),
+            golDarah:         formatValue(getExcelValue(row, 'golDarah'), 'golDarah')
+          };
+          newStudents.push(newStudent);
+          importedCount++;
+        }
+      });
+
+      if (importedCount > 0) {
+        const BATCH_SIZE = 100;
+
+        // === STEP 1: Fetch semua data existing dari DB untuk ID lookup ===
+        const { data: allExisting } = await supabase
+          .from('siswa')
+          .select('id, nisn, nik, nama_lengkap');
+
+        // Bangun lookup map: nisn/nik/nama → id (semua dinormalisasi lowercase+trim)
+        const nisnToId: Record<string, string> = {};
+        const nikToId:  Record<string, string> = {};
+        const namaToId: Record<string, string> = {};
+        (allExisting || []).forEach((r: any) => {
+          if (r.nisn) nisnToId[r.nisn.trim()]                              = r.id;
+          if (r.nik)  nikToId[r.nik.trim()]                                = r.id;
+          if (r.nama_lengkap) namaToId[r.nama_lengkap.trim().toLowerCase()] = r.id;
+        });
+
+        // === STEP 2: Normalisasi & deduplikasi data Excel ===
+        const seenNisns = new Set<string>();
+        const seenNiks  = new Set<string>();
+        const seenIds   = new Set<string>();
+        const deduped: Student[] = [];
+
+        for (const s of newStudents) {
+          const nisn = s.nisn?.trim() || '';
+          const nik  = s.nik?.trim()  || '';
+
+          // Cari ID existing: NISN → NIK → Nama
+          const existingId = (nisn && nisnToId[nisn])
+            || (nik  && nikToId[nik])
+            || namaToId[s.nama.trim().toLowerCase()];
+
+          const finalId = existingId || s.id;
+
+          // Skip jika ID ini sudah ada dalam batch ini (duplikat dalam Excel)
+          if (seenIds.has(finalId)) continue;
+          if (nisn && seenNisns.has(nisn)) continue;
+          if (nik  && seenNiks.has(nik))  continue;
+
+          seenIds.add(finalId);
+          if (nisn) seenNisns.add(nisn);
+          if (nik)  seenNiks.add(nik);
+
+          deduped.push({ ...s, id: finalId, nisn, nik });
+        }
+
+        // === STEP 3: Pisah menjadi toUpdate (ID sudah ada di DB) dan toInsert (baru) ===
+        const existingIdSet = new Set(Object.values(nisnToId)
+          .concat(Object.values(nikToId))
+          .concat(Object.values(namaToId)));
+
+        const toUpdate = deduped.filter(s => existingIdSet.has(s.id));
+        const toInsert = deduped.filter(s => !existingIdSet.has(s.id));
+
+        // === STEP 4: UPDATE siswa existing (by id — tidak ada conflict sama sekali) ===
+        if (toUpdate.length > 0) {
+          const updateRows = toUpdate.map(s => {
+            const row = mapStudentToDb(s);
+            // Pastikan nisn/nik null jika kosong
+            if (!row.nisn) row.nisn = null;
+            if (!row.nik)  row.nik  = null;
+            return row;
+          });
+          for (let i = 0; i < updateRows.length; i += BATCH_SIZE) {
+            const { error } = await supabase
+              .from('siswa')
+              .upsert(updateRows.slice(i, i + BATCH_SIZE), { onConflict: 'id' });
+            if (error) {
+              console.error('Update existing error:', JSON.stringify(error));
+              throw new Error(error.message || JSON.stringify(error));
+            }
+          }
+        }
+
+        // === STEP 5: INSERT siswa baru (satu per satu agar error bisa di-skip) ===
+        // Gunakan insert satu-per-satu agar siswa duplikat yang lolos tidak batalkan semua
+        let skipped = 0;
+        for (const s of toInsert) {
+          const row = mapStudentToDb(s);
+          row.nisn = s.nisn || null;
+          row.nik  = s.nik  || null;
+          const { error } = await supabase.from('siswa').insert([row]);
+          if (error) {
+            // Jika error karena duplikat (bukan error kritis), skip baris ini
+            if (error.code === '23505') {
+              console.warn('Skip duplikat saat insert:', s.nama, error.message);
+              skipped++;
+            } else {
+              console.error('Insert error:', JSON.stringify(error));
+              throw new Error(error.message || JSON.stringify(error));
+            }
+          }
+        }
+        if (skipped > 0) {
+          importedCount -= skipped;
+        }
+
+        // === STEP 6: Fetch ulang dari DB agar state lokal akurat ===
+        const { data: refreshed } = await supabase
+          .from('siswa')
+          .select('*')
+          .order('nama_lengkap', { ascending: true });
+
+        if (refreshed) {
+          const mappedRefreshed = refreshed.map(mapDbToStudent);
+          setStudents(mappedRefreshed);
+          localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(mappedRefreshed));
+          syncClasses(mappedRefreshed);
+        }
+      }
+      return importedCount;
+    } catch (error) {
+      throw error;
+    }
   };
 
   const downloadExcelTemplate = () => {

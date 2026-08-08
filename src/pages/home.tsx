@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
-import { useStudents, Student } from '@/hooks/useStudents';
+import { useStudents, Student, readExcelWorkbook } from '@/hooks/useStudents';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -24,7 +24,7 @@ import { StudentFormModal } from '@/components/modals/StudentFormModal';
 import { StudentDetailModal } from '@/components/modals/StudentDetailModal';
 import { ConfirmDeleteModal } from '@/components/modals/ConfirmDeleteModal';
 import { KelolaAdminModal } from '@/components/modals/KelolaAdminModal';
-
+import { ImportExcelModal } from '@/components/modals/ImportExcelModal';
 
 export default function Home() {
   const { toast } = useToast();
@@ -56,6 +56,9 @@ export default function Home() {
   
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [confirmReaktifId, setConfirmReaktifId] = useState<string | null>(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [pendingExcelFile, setPendingExcelFile] = useState<File | null>(null);
+  const [pendingSheetNames, setPendingSheetNames] = useState<string[]>([]);
 
   const fileInputExcelRef = useRef<HTMLInputElement>(null);
 
@@ -111,15 +114,53 @@ export default function Home() {
     });
   }, [students, filterKelas, filterStatus, searchTerm]);
 
-  // Import Excel - selalu gunakan sheet pertama
+  const importExcelFile = async (file: File, sheetName?: string) => {
+    const count = await importExcel(file, sheetName);
+    toast({ title: 'Import Berhasil', description: `${count} data siswa berhasil diimpor.` });
+  };
+
+  const closeImportModal = () => {
+    setImportModalOpen(false);
+    setPendingExcelFile(null);
+    setPendingSheetNames([]);
+  };
+
   const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (fileInputExcelRef.current) fileInputExcelRef.current.value = '';
 
     try {
-      const count = await importExcel(file);
-      toast({ title: 'Import Berhasil', description: `${count} data siswa berhasil diimpor.` });
+      const workbook = await readExcelWorkbook(file);
+      const sheetNames = workbook?.SheetNames || [];
+
+      if (sheetNames.length > 1) {
+        setPendingExcelFile(file);
+        setPendingSheetNames(sheetNames);
+        setImportModalOpen(true);
+        return;
+      }
+
+      await importExcelFile(file, sheetNames[0]);
+    } catch (err: any) {
+      const detail = err?.message || String(err) || '';
+      console.error('Import Excel gagal:', err);
+      toast({
+        variant: 'destructive',
+        title: 'Import Gagal',
+        description: detail
+          ? `Terjadi kesalahan: ${detail}`
+          : 'Pastikan file Excel Anda valid dan coba lagi.',
+      });
+    }
+  };
+
+  const handleSheetImport = async (sheetName: string) => {
+    if (!pendingExcelFile) return;
+
+    try {
+      await importExcelFile(pendingExcelFile, sheetName);
+      closeImportModal();
     } catch (err: any) {
       const detail = err?.message || String(err) || '';
       console.error('Import Excel gagal:', err);
@@ -423,6 +464,13 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        <ImportExcelModal
+          isOpen={importModalOpen}
+          onClose={closeImportModal}
+          sheetNames={pendingSheetNames}
+          onImport={handleSheetImport}
+        />
 
         {/* CONTENT AREA */}
         <div className="flex-1 min-h-0 bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col">
