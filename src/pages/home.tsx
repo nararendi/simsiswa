@@ -76,6 +76,30 @@ export default function Home() {
     };
   }, [students]);
 
+  const classStats = useMemo(() => {
+    const activeStudents = students.filter(s => s.status === 'Aktif');
+    const map: Record<string, { total: number; laki: number; perempuan: number }> = {};
+    
+    activeStudents.forEach(s => {
+      const kelas = s.kelas || 'Tanpa Kelas';
+      if (!map[kelas]) {
+        map[kelas] = { total: 0, laki: 0, perempuan: 0 };
+      }
+      map[kelas].total += 1;
+      if (s.jenisKelamin === 'Laki-laki') {
+        map[kelas].laki += 1;
+      } else {
+        map[kelas].perempuan += 1;
+      }
+    });
+
+    const sortedClasses = Object.keys(map).sort();
+    return sortedClasses.map(kelas => ({
+      kelas,
+      ...map[kelas]
+    }));
+  }, [students]);
+
   // Filtering
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
@@ -218,9 +242,51 @@ export default function Home() {
       </header>
 
       <main className="container mx-auto px-4 py-6 flex-1 flex flex-col gap-6">
-        
-
-
+        {/* BANNER REKAPITULASI KELAS */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200/80 p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+            <div>
+              <h2 className="text-md font-bold text-slate-800 flex items-center gap-2">
+                <Users2 className="w-5 h-5 text-indigo-600" />
+                Rekapitulasi Siswa Aktif per Kelas
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">Jumlah siswa aktif berdasarkan jenis kelamin per rombongan belajar</p>
+            </div>
+            <div className="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-bold w-fit">
+              Total Aktif: {stats.aktif} Siswa
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {classStats.length === 0 ? (
+              <div className="col-span-full text-center py-4 text-sm text-slate-400">
+                Tidak ada data siswa aktif
+              </div>
+            ) : (
+              classStats.map(c => (
+                <div key={c.kelas} className="bg-slate-50 hover:bg-slate-100/80 transition-colors border border-slate-100 p-3 rounded-lg flex flex-col justify-between">
+                  <div className="border-b border-slate-200/60 pb-1.5 mb-2">
+                    <span className="font-bold text-slate-700 text-sm">{c.kelas}</span>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs text-slate-500">
+                      <span>Laki-laki</span>
+                      <span className="font-semibold text-blue-600">{c.laki}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-slate-500">
+                      <span>Perempuan</span>
+                      <span className="font-semibold text-pink-600">{c.perempuan}</span>
+                    </div>
+                    <div className="flex justify-between text-xs border-t border-slate-200/40 pt-1 mt-1 font-semibold text-slate-700">
+                      <span>Total</span>
+                      <span>{c.total}</span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
         {/* NAVIGATION TABS */}
         <div className="flex border-b border-slate-200/80 gap-2 overflow-x-auto pb-px">
           <button
