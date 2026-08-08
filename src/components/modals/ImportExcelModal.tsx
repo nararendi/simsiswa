@@ -14,20 +14,27 @@ export function ImportExcelModal({
   isOpen: boolean;
   onClose: () => void;
   sheetNames: string[];
-  onImport: (sheetName: string) => void;
+  onImport: (sheetName: string) => Promise<void>;
 }) {
   const [selectedSheet, setSelectedSheet] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
 
   useEffect(() => {
     if (isOpen && sheetNames.length > 0) {
       setSelectedSheet(sheetNames[0]);
+      setIsImporting(false);
     }
   }, [isOpen, sheetNames]);
 
-  const handleImport = () => {
+  const handleImport = async () => {
     if (!selectedSheet) return;
-    onImport(selectedSheet);
-    onClose();
+    setIsImporting(true);
+    try {
+      await onImport(selectedSheet);
+    } finally {
+      setIsImporting(false);
+      onClose();
+    }
   };
 
   return (
@@ -65,11 +72,11 @@ export function ImportExcelModal({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} disabled={isImporting}>
             Batal
           </Button>
-          <Button onClick={handleImport} disabled={!selectedSheet} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-            Mulai Impor
+          <Button onClick={handleImport} disabled={!selectedSheet || isImporting} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+            {isImporting ? 'Mengimpor...' : 'Mulai Impor'}
           </Button>
         </DialogFooter>
       </DialogContent>

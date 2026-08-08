@@ -162,6 +162,7 @@ export default function Home() {
     } catch (err) {
       toast({ variant: 'destructive', title: 'Import Gagal', description: 'Gagal mengimpor sheet yang dipilih.' });
     } finally {
+      // Bersihkan file setelah import selesai (tidak di onClose)
       setExcelFile(null);
       setExcelSheetNames([]);
     }
@@ -738,7 +739,7 @@ export default function Home() {
 
       <ImportExcelModal
         isOpen={modalImportExcelOpen}
-        onClose={() => { setModalImportExcelOpen(false); setExcelFile(null); }}
+        onClose={() => setModalImportExcelOpen(false)}
         sheetNames={excelSheetNames}
         onImport={handleSelectSheetImport}
       />
