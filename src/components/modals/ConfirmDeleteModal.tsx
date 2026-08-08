@@ -24,7 +24,7 @@ export function ConfirmDeleteModal({
   isOpen: boolean;
   onClose: () => void;
   studentName: string;
-  onConfirm: (alasan: string, tanggal: string) => void;
+  onConfirm: (alasan: string, tanggal: string) => void | Promise<void>;
   isPermanent?: boolean;
 }) {
   const today = new Date().toISOString().split('T')[0];
