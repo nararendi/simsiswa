@@ -53,6 +53,52 @@ const STORAGE_KEY_YEAR = 'sim_tahun_ajaran';
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const sanitizeDate = (val: any): string | null => {
+  if (val === undefined || val === null) return null;
+  const clean = String(val).trim();
+  if (!clean) return null;
+
+  // If it's already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+    return clean;
+  }
+
+  // If it's DD/MM/YYYY or DD-MM-YYYY
+  const dmyMatch = clean.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmyMatch) {
+    const [, d, m, y] = dmyMatch;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+
+  // Try standard JS Date parsing
+  const parsed = Date.parse(clean);
+  if (!isNaN(parsed)) {
+    const d = new Date(parsed);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    if (yyyy > 1900 && yyyy < 2100) {
+      return `${yyyy}-${mm}-${dd}`;
+    }
+  }
+
+  // If it's an Excel serial number
+  if (/^\d+$/.test(clean)) {
+    const serial = parseInt(clean, 10);
+    const utc_days  = serial - 25569;
+    const utc_value = utc_days * 86400;
+    const date_info = new Date(utc_value * 1000);
+    const yyyy = date_info.getFullYear();
+    const mm = String(date_info.getMonth() + 1).padStart(2, '0');
+    const dd = String(date_info.getDate()).padStart(2, '0');
+    if (yyyy > 1900 && yyyy < 2100) {
+      return `${yyyy}-${mm}-${dd}`;
+    }
+  }
+
+  return null;
+};
+
 // Helper: Map Database Row to Student Interface
 export function mapDbToStudent(row: any): Student {
   return {
@@ -122,7 +168,7 @@ export function mapStudentToDb(student: Partial<Student>): any {
   if (student.jenisKelamin !== undefined) result.jenis_kelamin = student.jenisKelamin;
   if (student.agama !== undefined) result.agama = student.agama;
   if (student.kotaLahir !== undefined) result.tempat_lahir = student.kotaLahir;
-  if (student.tanggalLahir !== undefined) result.tanggal_lahir = student.tanggalLahir || null;
+  if (student.tanggalLahir !== undefined) result.tanggal_lahir = sanitizeDate(student.tanggalLahir);
   if (student.hpSiswa !== undefined) result.no_hp = student.hpSiswa;
   if (student.status !== undefined) result.status_siswa = student.status;
   
@@ -155,7 +201,7 @@ export function mapStudentToDb(student: Partial<Student>): any {
   if (student.anakKe !== undefined) result.anak_ke = student.anakKe;
   if (student.jumlahSaudara !== undefined) result.jumlah_saudara = student.jumlahSaudara;
   if (student.golDarah !== undefined) result.gol_darah = student.golDarah;
-  if (student.tanggalKeluar !== undefined) result.tanggal_keluar = student.tanggalKeluar || null;
+  if (student.tanggalKeluar !== undefined) result.tanggal_keluar = sanitizeDate(student.tanggalKeluar);
   if (student.alasanKeluar !== undefined) result.alasan_keluar = student.alasanKeluar;
   
   return result;
@@ -596,29 +642,6 @@ export function useStudents() {
           });
 
           if (importedCount > 0) {
-            // Upsert: timpa data yang sudah ada (NISN sama), tambah yang baru
-            const updatedStudents = [...students];
-
-            for (const incoming of newStudents) {
-              const existingIndex = updatedStudents.findIndex(
-                s => s.nisn && s.nisn === incoming.nisn
-              );
-              if (existingIndex >= 0) {
-                // Pertahankan ID asli agar Supabase bisa update row yang sama
-                updatedStudents[existingIndex] = {
-                  ...incoming,
-                  id: updatedStudents[existingIndex].id,
-                };
-              } else {
-                updatedStudents.unshift(incoming);
-              }
-            }
-
-            // Simpan ke state dan Supabase
-            setStudents(updatedStudents);
-            localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updatedStudents));
-            syncClasses(updatedStudents);
-
             // Ganti ID incoming agar sesuai dengan ID yang sudah ada di database jika ada
             const studentsToUpsert = newStudents.map(incoming => {
               const existing = students.find(s => s.nisn && s.nisn === incoming.nisn);
@@ -636,11 +659,33 @@ export function useStudents() {
             const { error } = await supabase
               .from('siswa')
               .upsert(dbRows, { onConflict: 'nisn' });
+            
             if (error) {
               console.error('Upsert Excel import error:', error);
               reject(error);
               return;
             }
+
+            // Gabungkan data baru ke state lokal (timpa yang ada, tambahkan yang baru ke akhir)
+            const updatedStudents = [...students];
+            for (const incoming of studentsToUpsert) {
+              const existingIndex = updatedStudents.findIndex(
+                s => s.nisn && s.nisn === incoming.nisn
+              );
+              if (existingIndex >= 0) {
+                updatedStudents[existingIndex] = incoming;
+              } else {
+                updatedStudents.push(incoming);
+              }
+            }
+
+            // Urutkan seluruh siswa secara alfabetis A-Z berdasarkan nama
+            updatedStudents.sort((a, b) => a.nama.localeCompare(b.nama));
+
+            // Simpan ke state dan localStorage (HANYA setelah database sukses)
+            setStudents(updatedStudents);
+            localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updatedStudents));
+            syncClasses(updatedStudents);
           }
           resolve(importedCount);
         } catch (error) {
