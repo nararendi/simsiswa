@@ -686,95 +686,106 @@ export function useStudents() {
           });
 
           if (importedCount > 0) {
-            // Normalisasi NISN & NIK: trim whitespace
-            const normalized = newStudents.map(s => ({
-              ...s,
-              nisn: s.nisn?.trim() || '',
-              nik:  s.nik?.trim()  || '',
-            }));
-
-            // --- Deduplikasi dalam Excel: ambil baris pertama jika ada duplikat NISN/NIK ---
-            const seenNisns = new Set<string>();
-            const seenNiks  = new Set<string>();
-            const deduped = normalized.filter(s => {
-              if (s.nisn && seenNisns.has(s.nisn)) return false;
-              if (s.nisn) seenNisns.add(s.nisn);
-              if (s.nik  && seenNiks.has(s.nik))  return false;
-              if (s.nik)  seenNiks.add(s.nik);
-              return true;
-            });
-
-            // --- Pisah 3 kelompok berdasarkan kolom unique yang dimiliki ---
-            // Kelompok 1: punya NISN → upsert onConflict:'nisn' (DB resolve sendiri)
-            const withNisn  = deduped.filter(s => !!s.nisn);
-            // Kelompok 2: tidak punya NISN, punya NIK → upsert onConflict:'nik'
-            const withNikOnly = deduped.filter(s => !s.nisn && !!s.nik);
-            // Kelompok 3: tidak punya NISN maupun NIK → insert biasa (null-safe)
-            const withNeither = deduped.filter(s => !s.nisn && !s.nik);
-
             const BATCH_SIZE = 100;
 
-            // Kelompok 1: upsert berdasarkan NISN — Supabase resolve sendiri conflict NISN
-            if (withNisn.length > 0) {
-              const rows = withNisn.map(s => {
+            // === STEP 1: Fetch semua data existing dari DB untuk ID lookup ===
+            const { data: allExisting } = await supabase
+              .from('siswa')
+              .select('id, nisn, nik, nama_lengkap');
+
+            // Bangun lookup map: nisn/nik/nama → id (semua dinormalisasi lowercase+trim)
+            const nisnToId: Record<string, string> = {};
+            const nikToId:  Record<string, string> = {};
+            const namaToId: Record<string, string> = {};
+            (allExisting || []).forEach((r: any) => {
+              if (r.nisn) nisnToId[r.nisn.trim()]                              = r.id;
+              if (r.nik)  nikToId[r.nik.trim()]                                = r.id;
+              if (r.nama_lengkap) namaToId[r.nama_lengkap.trim().toLowerCase()] = r.id;
+            });
+
+            // === STEP 2: Normalisasi & deduplikasi data Excel ===
+            const seenNisns = new Set<string>();
+            const seenNiks  = new Set<string>();
+            const seenIds   = new Set<string>();
+            const deduped: Student[] = [];
+
+            for (const s of newStudents) {
+              const nisn = s.nisn?.trim() || '';
+              const nik  = s.nik?.trim()  || '';
+
+              // Cari ID existing: NISN → NIK → Nama
+              const existingId = (nisn && nisnToId[nisn])
+                || (nik  && nikToId[nik])
+                || namaToId[s.nama.trim().toLowerCase()];
+
+              const finalId = existingId || s.id;
+
+              // Skip jika ID ini sudah ada dalam batch ini (duplikat dalam Excel)
+              if (seenIds.has(finalId)) continue;
+              if (nisn && seenNisns.has(nisn)) continue;
+              if (nik  && seenNiks.has(nik))  continue;
+
+              seenIds.add(finalId);
+              if (nisn) seenNisns.add(nisn);
+              if (nik)  seenNiks.add(nik);
+
+              deduped.push({ ...s, id: finalId, nisn, nik });
+            }
+
+            // === STEP 3: Pisah menjadi toUpdate (ID sudah ada di DB) dan toInsert (baru) ===
+            const existingIdSet = new Set(Object.values(nisnToId)
+              .concat(Object.values(nikToId))
+              .concat(Object.values(namaToId)));
+
+            const toUpdate = deduped.filter(s => existingIdSet.has(s.id));
+            const toInsert = deduped.filter(s => !existingIdSet.has(s.id));
+
+            // === STEP 4: UPDATE siswa existing (by id — tidak ada conflict sama sekali) ===
+            if (toUpdate.length > 0) {
+              const updateRows = toUpdate.map(s => {
                 const row = mapStudentToDb(s);
-                row.nisn = s.nisn;
-                row.nik  = s.nik  || null;
+                // Pastikan nisn/nik null jika kosong
+                if (!row.nisn) row.nisn = null;
+                if (!row.nik)  row.nik  = null;
                 return row;
               });
-              for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+              for (let i = 0; i < updateRows.length; i += BATCH_SIZE) {
                 const { error } = await supabase
                   .from('siswa')
-                  .upsert(rows.slice(i, i + BATCH_SIZE), { onConflict: 'nisn' });
+                  .upsert(updateRows.slice(i, i + BATCH_SIZE), { onConflict: 'id' });
                 if (error) {
-                  console.error('Upsert (nisn) error:', JSON.stringify(error));
+                  console.error('Update existing error:', JSON.stringify(error));
                   reject(new Error(error.message || JSON.stringify(error)));
                   return;
                 }
               }
             }
 
-            // Kelompok 2: upsert berdasarkan NIK — Supabase resolve sendiri conflict NIK
-            if (withNikOnly.length > 0) {
-              const rows = withNikOnly.map(s => {
-                const row = mapStudentToDb(s);
-                row.nisn = null;
-                row.nik  = s.nik;
-                return row;
-              });
-              for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-                const { error } = await supabase
-                  .from('siswa')
-                  .upsert(rows.slice(i, i + BATCH_SIZE), { onConflict: 'nik' });
-                if (error) {
-                  console.error('Upsert (nik) error:', JSON.stringify(error));
+            // === STEP 5: INSERT siswa baru (satu per satu agar error bisa di-skip) ===
+            // Gunakan insert satu-per-satu agar siswa duplikat yang lolos tidak batalkan semua
+            let skipped = 0;
+            for (const s of toInsert) {
+              const row = mapStudentToDb(s);
+              row.nisn = s.nisn || null;
+              row.nik  = s.nik  || null;
+              const { error } = await supabase.from('siswa').insert([row]);
+              if (error) {
+                // Jika error karena duplikat (bukan error kritis), skip baris ini
+                if (error.code === '23505') {
+                  console.warn('Skip duplikat saat insert:', s.nama, error.message);
+                  skipped++;
+                } else {
+                  console.error('Insert error:', JSON.stringify(error));
                   reject(new Error(error.message || JSON.stringify(error)));
                   return;
                 }
               }
             }
-
-            // Kelompok 3: insert siswa tanpa NISN dan NIK — pastikan null bukan ''
-            if (withNeither.length > 0) {
-              const rows = withNeither.map(s => {
-                const row = mapStudentToDb(s);
-                row.nisn = null;
-                row.nik  = null;
-                return row;
-              });
-              for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-                const { error } = await supabase
-                  .from('siswa')
-                  .insert(rows.slice(i, i + BATCH_SIZE));
-                if (error) {
-                  console.error('Insert (no-nisn-nik) error:', JSON.stringify(error));
-                  reject(new Error(error.message || JSON.stringify(error)));
-                  return;
-                }
-              }
+            if (skipped > 0) {
+              importedCount -= skipped;
             }
 
-            // Fetch ulang dari DB setelah semua operasi selesai agar state akurat
+            // === STEP 6: Fetch ulang dari DB agar state lokal akurat ===
             const { data: refreshed } = await supabase
               .from('siswa')
               .select('*')
