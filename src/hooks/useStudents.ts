@@ -293,17 +293,46 @@ export function useStudents() {
   // Soft delete: ubah status ke Non-Aktif + catat tanggal & alasan keluar
   const deleteStudent = async (id: string, alasan: string, tanggal: string) => {
     const studentObj = students.find(s => s.id === id);
-    const updated = students.map(s =>
-      s.id === id
-        ? { ...s, status: 'Non-Aktif' as const, tanggalKeluar: tanggal, alasanKeluar: alasan }
-        : s
-    );
-    setStudents(updated);
-    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updated));
-    syncClasses(updated);
+    if (!studentObj) return;
 
-    try {
-      if (studentObj) {
+    const isPermanent = studentObj.status === 'Non-Aktif' || studentObj.status === 'Pindah';
+
+    if (isPermanent) {
+      const updated = students.filter(s => s.id !== id);
+      setStudents(updated);
+      localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updated));
+      syncClasses(updated);
+
+      try {
+        const queryId = uuidRegex.test(id) ? id : null;
+        let query = supabase.from('siswa').delete();
+
+        if (queryId && studentObj.nisn) {
+          query = query.or(`id.eq.${queryId},nisn.eq.${studentObj.nisn}`);
+        } else if (queryId) {
+          query = query.eq('id', queryId);
+        } else if (studentObj.nisn) {
+          query = query.eq('nisn', studentObj.nisn);
+        } else {
+          throw new Error('No unique identifier found to delete student permanently');
+        }
+
+        const { error } = await query;
+        if (error) throw error;
+      } catch (err) {
+        console.error('Failed to delete student permanently in Supabase:', err);
+      }
+    } else {
+      const updated = students.map(s =>
+        s.id === id
+          ? { ...s, status: 'Non-Aktif' as const, tanggalKeluar: tanggal, alasanKeluar: alasan }
+          : s
+      );
+      setStudents(updated);
+      localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updated));
+      syncClasses(updated);
+
+      try {
         const queryId = uuidRegex.test(id) ? id : null;
         const updatePayload = {
           status_siswa: 'Non-Aktif',
@@ -324,9 +353,9 @@ export function useStudents() {
 
         const { error } = await query;
         if (error) throw error;
+      } catch (err) {
+        console.error('Failed to deactivate student in Supabase:', err);
       }
-    } catch (err) {
-      console.error('Failed to deactivate student in Supabase:', err);
     }
   };
 

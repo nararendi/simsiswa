@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertTriangle, UserMinus } from 'lucide-react';
+import { AlertTriangle, UserMinus, Trash2 } from 'lucide-react';
 
 const ALASAN_OPTIONS = [
   { value: 'Mutasi', label: 'Mutasi (Pindah Dalam Kota)' },
@@ -18,12 +18,14 @@ export function ConfirmDeleteModal({
   isOpen,
   onClose,
   studentName,
-  onConfirm
+  onConfirm,
+  isPermanent = false
 }: {
   isOpen: boolean;
   onClose: () => void;
   studentName: string;
   onConfirm: (alasan: string, tanggal: string) => void;
+  isPermanent?: boolean;
 }) {
   const today = new Date().toISOString().split('T')[0];
   const [alasan, setAlasan] = useState('');
@@ -38,7 +40,7 @@ export function ConfirmDeleteModal({
   }, [isOpen, today]);
 
   const handleConfirm = () => {
-    if (!alasan) return;
+    if (!isPermanent && !alasan) return;
     onConfirm(alasan, tanggal);
     onClose();
   };
@@ -49,10 +51,12 @@ export function ConfirmDeleteModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-rose-600">
             <UserMinus className="w-5 h-5" />
-            Non-Aktifkan Siswa
+            {isPermanent ? 'Hapus Siswa Secara Permanen' : 'Non-Aktifkan Siswa'}
           </DialogTitle>
           <DialogDescription>
-            Siswa tidak akan dihapus dari database, melainkan dipindahkan ke daftar <strong>Non-Aktif</strong>.
+            {isPermanent
+              ? 'Tindakan ini tidak dapat dibatalkan. Apakah Anda yakin ingin menghapus data ini secara permanen?'
+              : 'Siswa tidak akan dihapus dari database, melainkan dipindahkan ke daftar Non-Aktif.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -61,39 +65,43 @@ export function ConfirmDeleteModal({
           <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 flex items-center gap-3">
             <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0" />
             <p className="text-sm text-rose-800">
-              Anda akan me-non-aktifkan siswa: <span className="font-bold">{studentName}</span>
+              Anda akan {isPermanent ? 'menghapus secara permanen' : 'me-non-aktifkan'} siswa: <span className="font-bold">{studentName}</span>
             </p>
           </div>
 
-          {/* Alasan Keluar */}
-          <div className="space-y-2">
-            <Label htmlFor="alasan-keluar" className="font-medium">
-              Alasan Keluar <span className="text-destructive">*</span>
-            </Label>
-            <Select value={alasan} onValueChange={setAlasan}>
-              <SelectTrigger id="alasan-keluar">
-                <SelectValue placeholder="Pilih alasan keluar..." />
-              </SelectTrigger>
-              <SelectContent>
-                {ALASAN_OPTIONS.map(opt => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!isPermanent && (
+            <>
+              {/* Alasan Keluar */}
+              <div className="space-y-2">
+                <Label htmlFor="alasan-keluar" className="font-medium">
+                  Alasan Keluar <span className="text-destructive">*</span>
+                </Label>
+                <Select value={alasan} onValueChange={setAlasan}>
+                  <SelectTrigger id="alasan-keluar">
+                    <SelectValue placeholder="Pilih alasan keluar..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ALASAN_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          {/* Tanggal Keluar */}
-          <div className="space-y-2">
-            <Label htmlFor="tanggal-keluar" className="font-medium">Tanggal Keluar</Label>
-            <Input
-              id="tanggal-keluar"
-              type="date"
-              value={tanggal}
-              onChange={e => setTanggal(e.target.value)}
-            />
-          </div>
+              {/* Tanggal Keluar */}
+              <div className="space-y-2">
+                <Label htmlFor="tanggal-keluar" className="font-medium">Tanggal Keluar</Label>
+                <Input
+                  id="tanggal-keluar"
+                  type="date"
+                  value={tanggal}
+                  onChange={e => setTanggal(e.target.value)}
+                />
+              </div>
+            </>
+          )}
         </div>
 
         <DialogFooter>
@@ -101,11 +109,11 @@ export function ConfirmDeleteModal({
           <Button
             variant="destructive"
             onClick={handleConfirm}
-            disabled={!alasan}
+            disabled={!isPermanent && !alasan}
             className="gap-2"
           >
-            <UserMinus className="w-4 h-4" />
-            Non-Aktifkan Siswa
+            <Trash2 className="w-4 h-4" />
+            {isPermanent ? 'Hapus Permanen' : 'Non-Aktifkan Siswa'}
           </Button>
         </DialogFooter>
       </DialogContent>

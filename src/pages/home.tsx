@@ -583,10 +583,16 @@ export default function Home() {
         isOpen={modalDeleteOpen} 
         onClose={() => setModalDeleteOpen(false)}
         studentName={selectedStudent?.nama || ''}
+        isPermanent={selectedStudent?.status === 'Non-Aktif' || selectedStudent?.status === 'Pindah'}
         onConfirm={(alasan, tanggal) => {
           if (selectedStudent) {
+            const isPermanent = selectedStudent.status === 'Non-Aktif' || selectedStudent.status === 'Pindah';
             deleteStudent(selectedStudent.id, alasan, tanggal);
-            toast({ title: 'Siswa Di-non-aktifkan', description: `${selectedStudent.nama} telah dipindahkan ke daftar Non-Aktif. Alasan: ${alasan}.` });
+            if (isPermanent) {
+              toast({ title: 'Siswa Dihapus Permanen', description: `${selectedStudent.nama} telah dihapus secara permanen dari database.` });
+            } else {
+              toast({ title: 'Siswa Di-non-aktifkan', description: `${selectedStudent.nama} telah dipindahkan ke daftar Non-Aktif. Alasan: ${alasan}.` });
+            }
           }
         }}
       />
