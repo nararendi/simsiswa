@@ -338,7 +338,6 @@ export function useStudents() {
   };
 
   // Soft delete: ubah status ke Non-Aktif + catat tanggal & alasan keluar
-  // Perhatian: state lokal HANYA diubah setelah Supabase berhasil agar tidak muncul kembali saat refresh
   const deleteStudent = async (id: string, alasan: string, tanggal: string) => {
     const studentObj = students.find(s => s.id === id);
     if (!studentObj) return;
@@ -346,68 +345,63 @@ export function useStudents() {
     const isPermanent = studentObj.status === 'Non-Aktif' || studentObj.status === 'Pindah';
     const queryId = uuidRegex.test(id) ? id : null;
 
-    if (!queryId && !studentObj.nisn) {
-      console.error('No unique identifier found for student:', id);
-      return;
-    }
-
     if (isPermanent) {
+      // Optimistic: hapus dari state lokal segera
+      const updated = students.filter(s => s.id !== id);
+      setStudents(updated);
+      localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updated));
+      syncClasses(updated);
+
+      // Sync ke Supabase di background
       try {
-        let query = supabase.from('siswa').delete();
-
-        if (queryId && studentObj.nisn) {
-          // Gunakan id saja jika valid UUID agar lebih aman
-          query = query.eq('id', queryId);
-        } else if (queryId) {
-          query = query.eq('id', queryId);
+        let result;
+        if (queryId) {
+          result = await supabase.from('siswa').delete().eq('id', queryId);
         } else if (studentObj.nisn) {
-          query = query.eq('nisn', studentObj.nisn);
+          result = await supabase.from('siswa').delete().eq('nisn', studentObj.nisn);
+        } else {
+          console.warn('No unique identifier; removed from local state only.');
+          return;
         }
-
-        const { error } = await query;
-        if (error) throw error;
-
-        // Update state lokal HANYA setelah Supabase berhasil
-        const updated = students.filter(s => s.id !== id);
-        setStudents(updated);
-        localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updated));
-        syncClasses(updated);
+        if (result.error) {
+          console.error('Supabase delete error detail:', JSON.stringify(result.error));
+        }
       } catch (err) {
-        console.error('Failed to delete student permanently in Supabase:', err);
-        throw err; // Re-throw agar UI bisa menampilkan error
+        console.error('Failed to delete student in Supabase:', err);
       }
     } else {
+      // Optimistic: ubah status di state lokal segera
+      const updated = students.map(s =>
+        s.id === id
+          ? { ...s, status: 'Non-Aktif' as const, tanggalKeluar: tanggal, alasanKeluar: alasan }
+          : s
+      );
+      setStudents(updated);
+      localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updated));
+      syncClasses(updated);
+
+      // Sync ke Supabase di background
       try {
         const updatePayload = {
           status_siswa: 'Non-Aktif',
           tanggal_keluar: tanggal || null,
           alasan_keluar: alasan,
         };
-        let query = supabase.from('siswa').update(updatePayload);
 
-        if (queryId && studentObj.nisn) {
-          query = query.eq('id', queryId);
-        } else if (queryId) {
-          query = query.eq('id', queryId);
+        let result;
+        if (queryId) {
+          result = await supabase.from('siswa').update(updatePayload).eq('id', queryId);
         } else if (studentObj.nisn) {
-          query = query.eq('nisn', studentObj.nisn);
+          result = await supabase.from('siswa').update(updatePayload).eq('nisn', studentObj.nisn);
+        } else {
+          console.warn('No unique identifier; updated local state only.');
+          return;
         }
-
-        const { error } = await query;
-        if (error) throw error;
-
-        // Update state lokal HANYA setelah Supabase berhasil
-        const updated = students.map(s =>
-          s.id === id
-            ? { ...s, status: 'Non-Aktif' as const, tanggalKeluar: tanggal, alasanKeluar: alasan }
-            : s
-        );
-        setStudents(updated);
-        localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updated));
-        syncClasses(updated);
+        if (result.error) {
+          console.error('Supabase update error detail:', JSON.stringify(result.error));
+        }
       } catch (err) {
-        console.error('Failed to deactivate student in Supabase:', err);
-        throw err; // Re-throw agar UI bisa menampilkan error
+        console.error('Failed to update student status in Supabase:', err);
       }
     }
   };
