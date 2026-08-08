@@ -633,7 +633,7 @@ export default function Home() {
             updateStudent(selectedStudent.id, data);
             toast({ title: 'Berhasil', description: 'Data siswa berhasil diperbarui.' });
           } else {
-            addStudent({ ...data, id: 'std-' + Date.now() + Math.random().toString(36).substr(2, 9) });
+            addStudent({ ...data, id: crypto.randomUUID() });
             toast({ title: 'Berhasil', description: 'Siswa baru berhasil ditambahkan.' });
           }
         }}

@@ -154,9 +154,9 @@ export function mapStudentToDb(student: Partial<Student>): any {
     result.id = student.id;
   }
   
-  if (student.nisn !== undefined) result.nisn = student.nisn;
-  if (student.nis !== undefined) result.nis = student.nis;
-  if (student.nik !== undefined) result.nik = student.nik;
+  if (student.nisn !== undefined) result.nisn = student.nisn.trim() === '' ? null : student.nisn;
+  if (student.nis !== undefined) result.nis = student.nis.trim() === '' ? null : student.nis;
+  if (student.nik !== undefined) result.nik = student.nik.trim() === '' ? null : student.nik;
   
   if (student.nama !== undefined) {
     result.nama = student.nama;
@@ -584,7 +584,7 @@ export function useStudents() {
             const rawNama = getExcelValue(row, 'nama');
             const rawNisn = getExcelValue(row, 'nisn');
 
-            if (rawNama && rawNisn) {
+            if (rawNama) {
               // Parse Jenis Kelamin cerdas
               let jk = getExcelValue(row, 'jenisKelamin');
               let cleanJk: 'Laki-laki' | 'Perempuan' = 'Laki-laki';
@@ -644,7 +644,16 @@ export function useStudents() {
           if (importedCount > 0) {
             // Ganti ID incoming agar sesuai dengan ID yang sudah ada di database jika ada
             const studentsToUpsert = newStudents.map(incoming => {
-              const existing = students.find(s => s.nisn && s.nisn === incoming.nisn);
+              let existing = incoming.nisn
+                ? students.find(s => s.nisn && s.nisn === incoming.nisn)
+                : null;
+              
+              if (!existing) {
+                existing = students.find(
+                  s => s.nama.trim().toLowerCase() === incoming.nama.trim().toLowerCase()
+                );
+              }
+
               if (existing) {
                 return {
                   ...incoming,
@@ -654,11 +663,11 @@ export function useStudents() {
               return incoming;
             });
 
-            // Upsert ke Supabase (hanya data baru/update dari Excel, bukan seluruh state)
+            // Upsert ke Supabase (hanya data baru/update dari Excel, menggunakan conflict pada kolom id)
             const dbRows = studentsToUpsert.map(mapStudentToDb);
             const { error } = await supabase
               .from('siswa')
-              .upsert(dbRows, { onConflict: 'nisn' });
+              .upsert(dbRows, { onConflict: 'id' });
             
             if (error) {
               console.error('Upsert Excel import error:', error);
@@ -670,7 +679,7 @@ export function useStudents() {
             const updatedStudents = [...students];
             for (const incoming of studentsToUpsert) {
               const existingIndex = updatedStudents.findIndex(
-                s => s.nisn && s.nisn === incoming.nisn
+                s => s.id === incoming.id
               );
               if (existingIndex >= 0) {
                 updatedStudents[existingIndex] = incoming;
