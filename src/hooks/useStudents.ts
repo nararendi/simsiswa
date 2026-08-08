@@ -717,7 +717,7 @@ export function useStudents() {
             }
 
             // Ganti ID incoming agar sesuai dengan ID yang sudah ada di database jika ada
-            const studentsToUpsert = newStudents.map(incoming => {
+            const rawMapped = newStudents.map(incoming => {
               // 1. Cari di state lokal berdasarkan NISN (prioritas utama)
               let existing = incoming.nisn
                 ? students.find(s => s.nisn && s.nisn === incoming.nisn)
@@ -749,18 +749,65 @@ export function useStudents() {
               return incoming;
             });
 
-            // Upsert ke Supabase dalam batch 100 baris agar tidak melebihi batas payload
-            const dbRows = studentsToUpsert.map(mapStudentToDb);
+            // --- Deduplikasi: jika ada duplikat NISN/NIK/ID dalam Excel, ambil yang pertama ---
+            const seenIds   = new Set<string>();
+            const seenNisns = new Set<string>();
+            const seenNiks  = new Set<string>();
+            const studentsToUpsert = rawMapped.filter(s => {
+              if (seenIds.has(s.id)) return false;
+              seenIds.add(s.id);
+              if (s.nisn && seenNisns.has(s.nisn)) return false;
+              if (s.nisn) seenNisns.add(s.nisn);
+              if (s.nik  && seenNiks.has(s.nik))  return false;
+              if (s.nik)  seenNiks.add(s.nik);
+              return true;
+            });
+
+            // --- Pisahkan: existing (UPDATE) vs baru (INSERT) ---
+            const existingIds = new Set([
+              ...Object.values(dbExistingMap),
+              ...students.map(s => s.id),
+            ]);
+            const toUpdate = studentsToUpsert.filter(s => existingIds.has(s.id));
+            const toInsert = studentsToUpsert.filter(s => !existingIds.has(s.id));
+
             const BATCH_SIZE = 100;
-            for (let i = 0; i < dbRows.length; i += BATCH_SIZE) {
-              const batch = dbRows.slice(i, i + BATCH_SIZE);
-              const { error } = await supabase
-                .from('siswa')
-                .upsert(batch, { onConflict: 'id' });
-              if (error) {
-                console.error(`Upsert Excel import error (batch ${Math.floor(i / BATCH_SIZE) + 1}):`, JSON.stringify(error));
-                reject(new Error(error.message || JSON.stringify(error)));
-                return;
+
+            // UPDATE yang sudah ada (aman karena pakai ID yang sudah ada di DB)
+            if (toUpdate.length > 0) {
+              const updateRows = toUpdate.map(mapStudentToDb);
+              for (let i = 0; i < updateRows.length; i += BATCH_SIZE) {
+                const batch = updateRows.slice(i, i + BATCH_SIZE);
+                const { error } = await supabase
+                  .from('siswa')
+                  .upsert(batch, { onConflict: 'id' });
+                if (error) {
+                  console.error(`Update batch error:`, JSON.stringify(error));
+                  reject(new Error(error.message || JSON.stringify(error)));
+                  return;
+                }
+              }
+            }
+
+            // INSERT yang benar-benar baru (hapus nisn/nik kosong agar tidak tabrakan null-unique)
+            if (toInsert.length > 0) {
+              const insertRows = toInsert.map(s => {
+                const row = mapStudentToDb(s);
+                // Pastikan nisn/nik null (bukan '') agar tidak kena unique constraint
+                if (!row.nisn) row.nisn = null;
+                if (!row.nik)  row.nik  = null;
+                return row;
+              });
+              for (let i = 0; i < insertRows.length; i += BATCH_SIZE) {
+                const batch = insertRows.slice(i, i + BATCH_SIZE);
+                const { error } = await supabase
+                  .from('siswa')
+                  .insert(batch);
+                if (error) {
+                  console.error(`Insert batch error:`, JSON.stringify(error));
+                  reject(new Error(error.message || JSON.stringify(error)));
+                  return;
+                }
               }
             }
 
