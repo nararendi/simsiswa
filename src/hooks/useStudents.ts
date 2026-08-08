@@ -416,6 +416,48 @@ export function useStudents() {
     localStorage.setItem(STORAGE_KEY_CLASSES, JSON.stringify(newClasses));
   };
 
+  // Aktifkan kembali siswa non-aktif ke status Aktif
+  const reaktifkanSiswa = async (id: string) => {
+    const studentObj = students.find(s => s.id === id);
+    if (!studentObj) return;
+
+    const queryId = uuidRegex.test(id) ? id : null;
+
+    // Optimistic: ubah status di state lokal segera
+    const updated = students.map(s =>
+      s.id === id
+        ? { ...s, status: 'Aktif' as const, tanggalKeluar: '', alasanKeluar: '' }
+        : s
+    );
+    setStudents(updated);
+    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updated));
+    syncClasses(updated);
+
+    // Sync ke Supabase
+    try {
+      const updatePayload = {
+        status_siswa: 'Aktif',
+        tanggal_keluar: null,
+        alasan_keluar: null,
+      };
+
+      let result;
+      if (queryId) {
+        result = await supabase.from('siswa').update(updatePayload).eq('id', queryId);
+      } else if (studentObj.nisn) {
+        result = await supabase.from('siswa').update(updatePayload).eq('nisn', studentObj.nisn);
+      } else {
+        console.warn('No unique identifier; updated local state only.');
+        return;
+      }
+      if (result.error) {
+        console.error('Supabase reaktifkan error:', JSON.stringify(result.error));
+      }
+    } catch (err) {
+      console.error('Failed to reactivate student in Supabase:', err);
+    }
+  };
+
   const pindahKelas = async (studentIds: string[], targetClass: string) => {
     const updated = students.map((s) => {
       if (studentIds.includes(s.id)) {
@@ -760,6 +802,7 @@ export function useStudents() {
     addStudent,
     updateStudent,
     deleteStudent,
+    reaktifkanSiswa,
     updateTahunAjaran,
     updateClasses,
     pindahKelas,

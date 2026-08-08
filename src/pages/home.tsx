@@ -9,7 +9,7 @@ import {
   Users, UserCheck, User, Users2, Search, Filter, Calendar, Plus, 
   MoreVertical, FileSpreadsheet, Download, Upload, Database, 
   LayoutGrid, List, ChevronDown, CheckSquare, Settings, ArrowRightLeft,
-  ArrowUpCircle, GraduationCap, Eye, Edit, Trash2, LogOut, RefreshCw
+  ArrowUpCircle, GraduationCap, Eye, Edit, Trash2, LogOut, RefreshCw, RotateCcw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation } from 'wouter';
@@ -33,7 +33,7 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const {
     students, classes, tahunAjaran, isLoaded,
-    addStudent, updateStudent, deleteStudent, updateTahunAjaran,
+    addStudent, updateStudent, deleteStudent, reaktifkanSiswa, updateTahunAjaran,
     updateClasses, pindahKelas, luluskanSiswa, suggestNextClass,
     importExcel, downloadExcelTemplate, syncClasses, fetchStudents
   } = useStudents();
@@ -61,6 +61,7 @@ export default function Home() {
 
   
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [confirmReaktifId, setConfirmReaktifId] = useState<string | null>(null);
 
   const fileInputExcelRef = useRef<HTMLInputElement>(null);
 
@@ -533,10 +534,49 @@ export default function Home() {
                              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-amber-600 hover:bg-amber-50" onClick={() => { setSelectedStudent(student); setModalFormOpen(true); }}>
                               <Edit className="w-4 h-4" />
                             </Button>
-                            {student.status !== 'Alumni' && (
-                              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive hover:bg-destructive/10" onClick={() => { setSelectedStudent(student); setModalDeleteOpen(true); }}>
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+                            {/* Tab Non-Aktif: tampilkan tombol Aktifkan Kembali */}
+                            {(student.status === 'Non-Aktif' || student.status === 'Pindah') ? (
+                              confirmReaktifId === student.id ? (
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 px-2 text-xs text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-semibold"
+                                    onClick={async () => {
+                                      setConfirmReaktifId(null);
+                                      await reaktifkanSiswa(student.id);
+                                      toast({ title: 'Siswa Diaktifkan Kembali', description: `${student.nama} kembali ke status Aktif di kelas ${student.kelas || '-'}.` });
+                                    }}
+                                  >
+                                    Ya, Aktifkan
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 text-slate-500"
+                                    onClick={() => setConfirmReaktifId(null)}
+                                  >
+                                    ✕
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 hover:text-emerald-600 hover:bg-emerald-50"
+                                  title="Aktifkan Kembali"
+                                  onClick={() => setConfirmReaktifId(student.id)}
+                                >
+                                  <RotateCcw className="w-4 h-4" />
+                                </Button>
+                              )
+                            ) : (
+                              /* Tab Aktif/Alumni: tampilkan tombol hapus/non-aktifkan */
+                              student.status !== 'Alumni' && (
+                                <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive hover:bg-destructive/10" onClick={() => { setSelectedStudent(student); setModalDeleteOpen(true); }}>
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )
                             )}
                           </div>
                         </td>
@@ -579,19 +619,47 @@ export default function Home() {
                       </div>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                      <Button size="sm" variant="ghost" className="flex-1 text-xs" onClick={() => { setSelectedStudent(student); setModalDetailOpen(true); }}>
-                        <Eye className="w-3.5 h-3.5 mr-1.5" /> Detail
-                      </Button>
-                      <Button size="sm" variant="ghost" className="flex-1 text-xs hover:text-amber-600 hover:bg-amber-50" onClick={() => { setSelectedStudent(student); setModalFormOpen(true); }}>
-                        <Edit className="w-3.5 h-3.5 mr-1.5" /> Edit
-                      </Button>
-                      {student.status !== 'Alumni' && (
-                        <Button size="sm" variant="ghost" className="flex-none px-2 text-xs hover:text-destructive hover:bg-destructive/10" onClick={() => { setSelectedStudent(student); setModalDeleteOpen(true); }}>
-                          <Trash2 className="w-3.5 h-3.5" />
+                      {/* Card view action buttons */}
+                      <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                        <Button size="sm" variant="ghost" className="flex-1 text-xs" onClick={() => { setSelectedStudent(student); setModalDetailOpen(true); }}>
+                          <Eye className="w-3.5 h-3.5 mr-1.5" /> Detail
                         </Button>
-                      )}
-                    </div>
+                        <Button size="sm" variant="ghost" className="flex-1 text-xs hover:text-amber-600 hover:bg-amber-50" onClick={() => { setSelectedStudent(student); setModalFormOpen(true); }}>
+                          <Edit className="w-3.5 h-3.5 mr-1.5" /> Edit
+                        </Button>
+                        {(student.status === 'Non-Aktif' || student.status === 'Pindah') ? (
+                          confirmReaktifId === student.id ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="flex-none px-2 text-xs text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-semibold"
+                              onClick={async () => {
+                                setConfirmReaktifId(null);
+                                await reaktifkanSiswa(student.id);
+                                toast({ title: 'Siswa Diaktifkan Kembali', description: `${student.nama} kembali ke kelas ${student.kelas || '-'}.` });
+                              }}
+                            >
+                              ✓ Aktifkan
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="flex-none px-2 text-xs hover:text-emerald-600 hover:bg-emerald-50"
+                              title="Aktifkan Kembali"
+                              onClick={() => setConfirmReaktifId(student.id)}
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                            </Button>
+                          )
+                        ) : (
+                          student.status !== 'Alumni' && (
+                            <Button size="sm" variant="ghost" className="flex-none px-2 text-xs hover:text-destructive hover:bg-destructive/10" onClick={() => { setSelectedStudent(student); setModalDeleteOpen(true); }}>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )
+                        )}
+                      </div>
                   </div>
                 ))}
               </div>
