@@ -590,12 +590,28 @@ export function useStudents() {
             localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updatedStudents));
             syncClasses(updatedStudents);
 
-            // Upsert ke Supabase (conflict pada kolom nisn)
-            const dbRows = updatedStudents.map(mapStudentToDb);
+            // Ganti ID incoming agar sesuai dengan ID yang sudah ada di database jika ada
+            const studentsToUpsert = newStudents.map(incoming => {
+              const existing = students.find(s => s.nisn && s.nisn === incoming.nisn);
+              if (existing) {
+                return {
+                  ...incoming,
+                  id: existing.id
+                };
+              }
+              return incoming;
+            });
+
+            // Upsert ke Supabase (hanya data baru/update dari Excel, bukan seluruh state)
+            const dbRows = studentsToUpsert.map(mapStudentToDb);
             const { error } = await supabase
               .from('siswa')
               .upsert(dbRows, { onConflict: 'nisn' });
-            if (error) console.error('Upsert Excel import error:', error);
+            if (error) {
+              console.error('Upsert Excel import error:', error);
+              reject(error);
+              return;
+            }
           }
           resolve(importedCount);
         } catch (error) {
