@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { Info, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Student } from '@/hooks/useStudents';
@@ -13,7 +14,8 @@ export function KelolaKelasModal({
   classes,
   students,
   updateClasses,
-  syncClasses
+  syncClasses,
+  deleteClass
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -21,14 +23,57 @@ export function KelolaKelasModal({
   students: Student[];
   updateClasses: (classes: string[]) => void;
   syncClasses: () => void;
+  deleteClass: (className: string) => void | Promise<void>;
 }) {
   const { toast } = useToast();
   const [newClass, setNewClass] = useState('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [pendingDeleteClass, setPendingDeleteClass] = useState<string | null>(null);
+  const [adminPassword, setAdminPassword] = useState('');
 
   const getStudentCount = (className: string) => students.filter(s => s.kelas === className).length;
+
+  const getAdminCredential = () => {
+    const storedAdmin = localStorage.getItem('sim_admin_cred');
+    return storedAdmin
+      ? JSON.parse(storedAdmin)
+      : { email: 'admin@gmail.com', password: 'admin123' };
+  };
+
+  const handleDelete = (className: string) => {
+    setPendingDeleteClass(className);
+    setAdminPassword('');
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDeleteClass) return;
+
+    const adminCred = getAdminCredential();
+    if (adminPassword !== adminCred.password) {
+      toast({ variant: 'destructive', title: 'Password Salah', description: 'Password admin tidak valid.' });
+      return;
+    }
+
+    const className = pendingDeleteClass;
+    const count = getStudentCount(className);
+    setPendingDeleteClass(null);
+    setAdminPassword('');
+
+    try {
+      await deleteClass(className);
+      toast({
+        title: 'Berhasil',
+        description: count > 0
+          ? `Kelas ${className} dan ${count} siswa di dalamnya berhasil dihapus.`
+          : `Kelas ${className} berhasil dihapus.`
+      });
+    } catch (err) {
+      console.error('Failed to delete class:', err);
+      toast({ variant: 'destructive', title: 'Gagal Hapus', description: 'Terjadi kesalahan saat menghapus kelas.' });
+    }
+  };
 
   const handleAdd = () => {
     if (!newClass.trim()) return;
@@ -64,16 +109,6 @@ export function KelolaKelasModal({
     updateClasses(newClasses);
     setEditingIndex(null);
     toast({ title: 'Berhasil', description: 'Nama kelas diubah.' });
-  };
-
-  const handleDelete = (className: string) => {
-    if (getStudentCount(className) > 0) {
-      toast({ variant: 'destructive', title: 'Gagal Hapus', description: 'Masih ada siswa di kelas ini.' });
-      return;
-    }
-    const newClasses = classes.filter(c => c !== className);
-    updateClasses(newClasses);
-    toast({ title: 'Berhasil', description: `Kelas ${className} dihapus.` });
   };
 
   const filteredClasses = classes.filter(c => c.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -177,8 +212,7 @@ export function KelolaKelasModal({
                                 variant="ghost" 
                                 className="h-8 w-8 text-destructive" 
                                 onClick={() => handleDelete(c)}
-                                disabled={count > 0}
-                                title={count > 0 ? "Tidak bisa dihapus, ada siswa" : "Hapus kelas"}
+                                title={count > 0 ? "Hapus kelas dan semua siswa di dalamnya" : "Hapus kelas"}
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
@@ -199,6 +233,55 @@ export function KelolaKelasModal({
             Sinkronisasi Data
           </Button>
           <Button onClick={onClose}>Tutup</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog open={!!pendingDeleteClass} onOpenChange={() => setPendingDeleteClass(null)}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-rose-600">
+            <Trash2 className="w-5 h-5" />
+            Konfirmasi Hapus Kelas
+          </DialogTitle>
+          <DialogDescription>
+            Hapus kelas <span className="font-semibold">{pendingDeleteClass}</span> dan semua siswa yang berada di kelas ini.
+            Masukkan password admin untuk meneruskan.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+            {pendingDeleteClass && (
+              <>
+                Kelas ini memiliki <span className="font-semibold">{getStudentCount(pendingDeleteClass)}</span> siswa.
+              </>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="admin-password" className="font-medium">Password Admin</Label>
+            <Input
+              id="admin-password"
+              type="password"
+              value={adminPassword}
+              onChange={(e) => setAdminPassword(e.target.value)}
+              placeholder="Masukkan password admin untuk konfirmasi"
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => { setPendingDeleteClass(null); setAdminPassword(''); }}>
+            Batal
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={confirmDelete}
+            disabled={!adminPassword.trim()}
+          >
+            Hapus Kelas
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

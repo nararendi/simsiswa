@@ -31,7 +31,7 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const {
     students, classes, tahunAjaran, isLoaded,
-    addStudent, updateStudent, deleteStudent, reaktifkanSiswa, updateTahunAjaran,
+    addStudent, updateStudent, deleteStudent, deleteClass, reaktifkanSiswa, updateTahunAjaran,
     updateClasses, pindahKelas, luluskanSiswa, suggestNextClass,
     importExcel, downloadExcelTemplate, syncClasses, fetchStudents
   } = useStudents();
@@ -690,7 +690,7 @@ export default function Home() {
       <KelolaKelasModal 
         isOpen={modalKelolaKelasOpen} onClose={() => setModalKelolaKelasOpen(false)}
         classes={classes} students={students} updateClasses={updateClasses} syncClasses={syncClasses}
-        deleteStudent={deleteStudent}
+        deleteClass={deleteClass}
       />
       <PindahKelasModal 
         isOpen={modalPindahKelasOpen} onClose={() => setModalPindahKelasOpen(false)}

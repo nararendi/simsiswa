@@ -411,6 +411,26 @@ export function useStudents() {
     }
   };
 
+  const deleteClass = async (className: string) => {
+    const updatedStudents = students.filter((s) => s.kelas !== className);
+    setStudents(updatedStudents);
+    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(updatedStudents));
+
+    const updatedClasses = classes.filter((c) => c !== className);
+    setClasses(updatedClasses);
+    localStorage.setItem(STORAGE_KEY_CLASSES, JSON.stringify(updatedClasses));
+
+    try {
+      const { error } = await supabase
+        .from('siswa')
+        .delete()
+        .eq('kelas', className);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Failed to delete students for class in Supabase:', err);
+    }
+  };
+
   const updateTahunAjaran = (year: string) => {
     setTahunAjaran(year);
     localStorage.setItem(STORAGE_KEY_YEAR, year);
@@ -863,6 +883,7 @@ export function useStudents() {
     addStudent,
     updateStudent,
     deleteStudent,
+    deleteClass,
     reaktifkanSiswa,
     updateTahunAjaran,
     updateClasses,
