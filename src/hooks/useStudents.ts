@@ -686,12 +686,49 @@ export function useStudents() {
           });
 
           if (importedCount > 0) {
+            // --- Cross-check ke Supabase: cari siswa existing berdasarkan NISN & NIK ---
+            // Ini penting agar siswa yang sudah ada di DB (tapi belum ter-load di state)
+            // tidak dianggap "baru" sehingga melanggar unique constraint (nik, nisn, dll.)
+            const incomingNisns = newStudents.map(s => s.nisn).filter(Boolean);
+            const incomingNiks  = newStudents.map(s => s.nik).filter(Boolean);
+
+            let dbExistingMap: Record<string, string> = {}; // key: nisn|nik -> id
+
+            if (incomingNisns.length > 0) {
+              const { data: byNisn } = await supabase
+                .from('siswa')
+                .select('id, nisn, nik')
+                .in('nisn', incomingNisns);
+              (byNisn || []).forEach((r: any) => {
+                if (r.nisn) dbExistingMap[`nisn:${r.nisn}`] = r.id;
+                if (r.nik)  dbExistingMap[`nik:${r.nik}`]  = r.id;
+              });
+            }
+
+            if (incomingNiks.length > 0) {
+              const { data: byNik } = await supabase
+                .from('siswa')
+                .select('id, nisn, nik')
+                .in('nik', incomingNiks);
+              (byNik || []).forEach((r: any) => {
+                if (r.nisn) dbExistingMap[`nisn:${r.nisn}`] = r.id;
+                if (r.nik)  dbExistingMap[`nik:${r.nik}`]  = r.id;
+              });
+            }
+
             // Ganti ID incoming agar sesuai dengan ID yang sudah ada di database jika ada
             const studentsToUpsert = newStudents.map(incoming => {
+              // 1. Cari di state lokal berdasarkan NISN (prioritas utama)
               let existing = incoming.nisn
                 ? students.find(s => s.nisn && s.nisn === incoming.nisn)
                 : null;
               
+              // 2. Cari di state lokal berdasarkan NIK
+              if (!existing && incoming.nik) {
+                existing = students.find(s => s.nik && s.nik === incoming.nik);
+              }
+
+              // 3. Cari di state lokal berdasarkan nama
               if (!existing) {
                 existing = students.find(
                   s => s.nama.trim().toLowerCase() === incoming.nama.trim().toLowerCase()
@@ -699,11 +736,16 @@ export function useStudents() {
               }
 
               if (existing) {
-                return {
-                  ...incoming,
-                  id: existing.id
-                };
+                return { ...incoming, id: existing.id };
               }
+
+              // 4. Cari di Supabase (cross-check) berdasarkan NISN atau NIK
+              const dbId = (incoming.nisn && dbExistingMap[`nisn:${incoming.nisn}`])
+                || (incoming.nik && dbExistingMap[`nik:${incoming.nik}`]);
+              if (dbId) {
+                return { ...incoming, id: dbId };
+              }
+
               return incoming;
             });
 
