@@ -28,7 +28,7 @@ export default function Login() {
     setTimeout(() => {
       setIsLoading(false);
       if (email === adminCred.email && password === adminCred.password) {
-        localStorage.setItem('sim_auth_token', 'logged_in_admin');
+        sessionStorage.setItem('sim_auth_token', 'logged_in_admin');
         toast({
           title: 'Login Berhasil',
           description: 'Selamat datang kembali di SIM-SISWA!',

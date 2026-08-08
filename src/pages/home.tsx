@@ -203,7 +203,7 @@ export default function Home() {
                 <DropdownMenuItem 
                   className="text-rose-600 focus:text-rose-600 focus:bg-rose-50 hover:bg-rose-50 cursor-pointer"
                   onClick={() => {
-                    localStorage.removeItem('sim_auth_token');
+                    sessionStorage.removeItem('sim_auth_token');
                     toast({ title: 'Logout Berhasil', description: 'Anda telah keluar dari sistem.' });
                     setLocation('/login');
                   }}

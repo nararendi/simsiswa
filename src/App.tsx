@@ -15,7 +15,7 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    const isLoggedIn = localStorage.getItem('sim_auth_token') === 'logged_in_admin';
+    const isLoggedIn = sessionStorage.getItem('sim_auth_token') === 'logged_in_admin';
     if (!isLoggedIn) {
       setLocation('/login');
     }
